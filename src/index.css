@@ -1,0 +1,33 @@
+/* Import Poppins and Pacifico fonts from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Pacifico&display=swap');
+
+/* purgecss start ignore */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* purgecss end ignore */
+
+/* Global base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: backgroundColor;
+  color: textPrimaryColor;
+}
+
+/* Reusable component styles */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-primaryGreen text-textPrimaryColor rounded-3xl hover:bg-hoverGreen transition-colors font-poppins font-semibold text-sm;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-transparent text-hoverGreen border-2 border-hoverGreen rounded-3xl hover:bg-hoverGreen hover:text-white transition-colors font-poppins font-semibold text-sm;
+  }
+  
+}
