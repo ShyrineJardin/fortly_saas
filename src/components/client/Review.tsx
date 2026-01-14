@@ -25,7 +25,7 @@ export default function Review() {
             {/* Header Section */}
             <div className="flex items-start justify-between mb-6">
                 {/* Rating Display */}
-                <div className="flex items-end gap-2">
+                <div className="flex flex-col align-centeritems-end gap-2">
                     <h2 className="text-5xl font-bold">{rating.toFixed(1)}</h2>
                     <div className="flex items-center gap-0.5 mb-2">
                         {[...Array(totalStars)].map((_, index) => (
