@@ -1,7 +1,18 @@
 import React, { useState } from "react";
 import { FaStar, FaRegStar } from "react-icons/fa6";
+import ReviewCard from "../shared/ReviewCard";
 
 export default function Review() {
+    const [reviews, setReviews] = useState([
+        {
+            id: 1,
+            fullName: "Test",
+            reviewText: "Lorem ipsum dolor sit amet. 33 omnis placeat sit corrupti excepturi et illum eveniet ea inventore.",
+            rating: 4,
+            date: "2 months ago"
+        }
+    ]);
+
     const rating = 4.0;
     const totalStars = 5;
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,13 +37,13 @@ export default function Review() {
             <div className="flex items-start justify-between mb-6">
                 {/* Rating Display */}
                 <div className="flex flex-col align-centeritems-end gap-2">
-                    <h2 className="text-5xl font-bold">{rating.toFixed(1)}</h2>
+                    <h2 className="lg:text-5xl text-4xl font-bold">{rating.toFixed(1)}</h2>
                     <div className="flex items-center gap-0.5 mb-2">
                         {[...Array(totalStars)].map((_, index) => (
                             <span key={index} className={index < Math.floor(rating) ? "text-yellow-400" : "text-gray-300"}>
                                 {index < Math.floor(rating) 
-                                    ? FaStar({size: 18}) 
-                                    : FaRegStar({size: 18})}
+                                    ? FaStar({size: "1rem"}) 
+                                    : FaRegStar({size: "1rem"})}
                             </span>
                         ))}
                     </div>
@@ -47,29 +58,17 @@ export default function Review() {
                 </button>
             </div>
 
-            {/* Review Card */}
-            <div>
-                {/* Reviewer Info */}
-                <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold text-base">Test</h3>
-                    <span className="text-gray-400 text-xs">• 2 months ago</span>
-                </div>
-
-                {/* Reviewer Stars */}
-                <div className="flex items-center gap-0.5 mb-3">
-                    {[...Array(totalStars)].map((_, index) => (
-                        <span key={index} className={index < 4 ? "text-yellow-400" : "text-gray-300"}>
-                            {index < 4 
-                                ? FaStar({size: 14}) 
-                                : FaRegStar({size: 14})}
-                        </span>
-                    ))}
-                </div>
-
-                {/* Review Text */}
-                <p className="md:text-sm text-xs text-gray-700 leading-relaxed">
-                    Lorem ipsum dolor sit amet. 33 omnis placeat sit corrupti excepturi et illum eveniet ea inventore voluptates aut ipsam voluptatem in dignissimos et deserunt. Ut quiderat cumque non tenetur cupiditate qui out
-                </p>
+            {/* Dynamic List using the Shared Card */}
+            <div className="mt-4">
+                {reviews.map((rev) => (
+                    <ReviewCard 
+                        key={rev.id}
+                        fullName={rev.fullName}
+                        date={rev.date}
+                        rating={rev.rating}
+                        reviewText={rev.reviewText}
+                    />
+                ))}
             </div>
 
             {/* Modal */}
