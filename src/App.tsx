@@ -4,6 +4,7 @@ import ServicesPage from "./pages/client/ServicesPage"
 import ReviewsPage from "./pages/client/ReviewsPage"
 import BookingPage from "./pages/client/BookingPage"
 import ConfirmationPage from "./pages/client/ConfirmationPage"
+import Chat from "./components/client/Chat"
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/reviews" element={<ReviewsPage />} />
         <Route path="/booking" element={<BookingPage />} />
         <Route path="/confirmation" element={<ConfirmationPage />} />
+        <Route path="/chat" element={<Chat />} />
       </Routes>
     </BrowserRouter>
   )

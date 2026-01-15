@@ -48,7 +48,7 @@ export default function Review() {
             </div>
 
             {/* Review Card */}
-            <div className="border border-gray-200 p-4 rounded-lg">
+            <div>
                 {/* Reviewer Info */}
                 <div className="flex items-center gap-2 mb-2">
                     <h3 className="font-semibold text-base">Test</h3>
@@ -67,7 +67,7 @@ export default function Review() {
                 </div>
 
                 {/* Review Text */}
-                <p className="text-sm text-gray-700 leading-relaxed">
+                <p className="md:text-sm text-xs text-gray-700 leading-relaxed">
                     Lorem ipsum dolor sit amet. 33 omnis placeat sit corrupti excepturi et illum eveniet ea inventore voluptates aut ipsam voluptatem in dignissimos et deserunt. Ut quiderat cumque non tenetur cupiditate qui out
                 </p>
             </div>
@@ -77,29 +77,29 @@ export default function Review() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-md relative">
                         {/* Modal Header */}
-                        <h2 className="text-xl font-semibold mb-6">Write a Review</h2>
+                        <h2 className="lg:text-xl text-base font-semibold mb-6">Write a Review</h2>
 
                         {/* Full Name Input */}
                         <div className="mb-4">
-                            <label className="block text-sx font-medium mb-2">Full name</label>
+                            <label className="block md:text-sm text-xs font-medium mb-2">Full name</label>
                             <input
                                 type="text"
                                 placeholder="Full name"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen"
+                                className="md:text-sm text-xs w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen"
                             />
                         </div>
 
                         {/* Review Textarea */}
                         <div className="mb-6">
-                            <label className="block text-sm font-medium mb-2">Review</label>
+                            <label className="block md:text-sm text-xs font-medium mb-2">Review</label>
                             <textarea
                                 placeholder="Message"
                                 value={reviewText}
                                 onChange={(e) => setReviewText(e.target.value)}
                                 rows={4}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen resize-none"
+                                className="md:text-sm text-xs w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen resize-none"
                             />
                         </div>
 
@@ -114,8 +114,8 @@ export default function Review() {
                                     className="text-yellow-400 hover:scale-110 transition-transform"
                                 >
                                     {(hoveredStar || reviewRating) > index 
-                                        ? FaStar({size: 28}) 
-                                        : FaRegStar({size: 28})}
+                                        ? FaStar({size: "1.5rem"}) 
+                                        : FaRegStar({size: "1.5rem"})}
                                 </button>
                             ))}
                         </div>

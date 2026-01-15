@@ -57,7 +57,7 @@ const [selectedDate, setSelectedDate] = useState(null);
         {/* Header */}
         <div className="mb-6 border-b border-gray-100 w-full">
           <button className="flex items-center gap-2 mb-4"><a href="/services">{FaChevronLeft({size: 16})}</a>
-            <span className="text-base font-semibold">Booking details</span>
+            <span className="text-sm lg:text-base font-semibold">Booking details</span>
           </button>
         </div>
 
@@ -65,32 +65,32 @@ const [selectedDate, setSelectedDate] = useState(null);
 
           {/* Main Content */}
           <div className="lg:col-span-2">
-            {/* Booking Policy */}
+            {/* Booking Policy Section */}
             <div className="bg-policyBackground p-6 rounded-2xl border border-policyBorder gap-4 flex flex-col mb-6">
-                <h2 className="text-base font-semibold">Booking Policy</h2>
-                <div className="text-policyBodyText text-sm">
+              <h2 className="lg:text-base text-sm font-semibold">Booking Policy</h2>
+              <div className="text-policyBodyText lg:text-sm text-xs">
                 <p>Our booking policy ensures that all appointments are scheduled fairly and efficiently.</p>
                 <ol className="list-decimal list-inside space-y-1 mt-2">
-                    <li>All bookings must be made at least 24 hours in advance.</li>
-                    <li>Cancellations must be made at least 12 hours prior.</li>
+                  <li>All bookings must be made at least 24 hours in advance.</li>
+                  <li>Cancellations must be made at least 12 hours prior.</li>
                 </ol>
-                </div>
+              </div>
             </div>
 
             {/* Service Card */}
-            <div className="bg-white border border-border rounded-2xl p-4 shadow-sm mb-4">
+            <div className="bg-white border border-border rounded-2xl lg:p-4 p-2 shadow-sm mb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-start gap-4">
                   {/* Image Placeholder */}
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg flex-shrink-0" />
+                  <div className="lg:w-16 lg:h-16 w-12 h-12 bg-gray-200 rounded-lg flex-shrink-0" />
                   
                   {/* Text Content */}
                   <div>
-                    <h3 className="text-base font-semibold">Service Card</h3>
-                    <p className="text-sm">25 mins . PHP 1,500.00</p>
+                    <h3 className="lg:text-base text-sm font-semibold">Service Card</h3>
+                    <p className="lg:text-sm text-xs">25 mins . PHP 1,500.00</p>
                     <button 
                       onClick={() => setIsOpen(!isOpen)}
-                      className="text-sm flex items-center gap-1 mt-1 hover:underline"
+                      className="lg:text-sm text-xs flex items-center gap-1 lg:mt-1 hover:underline"
                     >
                       More Details 
                       {isOpen ? FaAngleUp({size: 14}) : FaAngleDown({size: 14})}
@@ -98,19 +98,19 @@ const [selectedDate, setSelectedDate] = useState(null);
                   </div>
                 </div>
     
-               </div> 
+              </div> 
     
-            {/* Expandable Details Area */}
+              {/* Expandable Details Area */}
               {isOpen && (
-                <div className="mt-4 border-t border-gray-50 text-sm text-gray-600 animate-in fade-in slide-in-from-top-1">
+                <div className="mt-4 border-t border-gray-50 lg:text-sm text-xs text-gray-600 animate-in fade-in slide-in-from-top-1">
                   Lorem ipsum dolor sit amet. Qui ullam rerum est voluptas consequatur eum asperiores aliquam est maxime doloremque. Hic blanditiis debitis et dolores voluptate ut repudiandae necessitatibus et sint voluptatibus.
                 </div>
               )}
-            </div> 
+            </div>  
 
             {/* Date and Time Selection */}
             <div className="mb-6"> 
-              <h2 className="font-semibold mb-3 text-base">Select date and time</h2>
+              <h2 className="font-semibold mb-3 lg:text-base text-sm">Select date and time</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Calendar Section */}
@@ -191,7 +191,7 @@ const [selectedDate, setSelectedDate] = useState(null);
                       <button
                         key={index}
                         onClick={() => setSelectedTime(time)}
-                        className={`w-full py-3 px-4 rounded-lg border text-sm font-medium transition-colors ${
+                        className={`w-full py-3 px-4 rounded-lg border md:text-sm text-xs font-medium transition-colors ${
                           selectedTime === time
                             ? "bg-primaryGreen text-white border-primaryGreen"
                             : "border-gray-200 hover:border-primaryGreen hover:bg-gray-50"
@@ -209,63 +209,63 @@ const [selectedDate, setSelectedDate] = useState(null);
             <div className="mb-6">
               <div className="grid grid-cols-2 gap-7 mb-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Full name</label>
+                  <label className="block md:text-sm text-xs font-medium mb-2">Full name</label>
                   <input
                     type="text"
                     name="fullName"
                     placeholder="Full name"
                     value={formData.fullName}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen md:text-sm text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Email Address</label>
+                  <label className="block md:text-sm text-xs font-medium mb-2">Email Address</label>
                   <input
                     type="email"
                     name="emailAddress"
                     placeholder="Email Address"
                     value={formData.emailAddress}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen md:text-sm text-xs"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-7 mb-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Mobile number</label>
+                  <label className="block md:text-sm text-xs font-medium mb-2">Mobile number</label>
                   <input
                     type="tel"
                     name="mobileNumber"
                     placeholder="Mobile number"
                     value={formData.mobileNumber}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen md:text-sm text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Address</label>
+                  <label className="block md:text-sm text-xs font-medium mb-2">Address</label>
                   <input
                     type="text"
                     name="address"
                     placeholder="Address"
                     value={formData.address}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen md:text-sm text-xs"
                   />
                 </div>
               </div>
 
               <div className="mb-6">
-                <label className="block text-sm font-medium mb-2">Message (optional)</label>
+                <label className="block md:text-sm text-xs font-medium mb-2">Message (optional)</label>
                 <textarea
                   name="message"
                   placeholder="Notes / Message"
                   value={formData.message}
                   onChange={handleInputChange}
                   rows={4}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen resize-none text-sm"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen resize-none md:text-sm text-xs"
                 />
               </div>
 

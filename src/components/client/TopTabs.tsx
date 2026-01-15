@@ -24,7 +24,7 @@ export default function TopTabs() {
   const activeTab = getActiveTab()
 
   return (
-    <div className='flex justify-center gap-12 mb-6 border-b border-gray-100 w-full'>
+    <div className='flex justify-center gap-6 lg:gap-12 mb-4 lg:mb-6 border-b border-gray-100 w-full'>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.name
 
@@ -32,18 +32,21 @@ export default function TopTabs() {
           <button
             key={tab.name}
             onClick={() => navigate(tab.path)}
-            className={`flex flex-col items-center gap-1 pb-3 transition-all relative ${
+            className={`flex flex-col items-center gap-1 pb-3 transition-all relative flex-1 lg:flex-initial ${
               isActive ? 'text-primaryGreen' : 'text-textSecondary hover:text-textPrimary'
             }`}
           >
-            <span className="text-2xl">
+            {/* Icon - smaller on mobile, larger on desktop */}
+            <span className="text-xl lg:text-2xl">
               {tab.icon({})}
             </span>
 
-            <span className="font-poppins font-medi text-sm">
+            {/* Label - smaller text on mobile */}
+            <span className="font-poppins font-medium text-xs lg:text-sm">
               {tab.name}
             </span>
 
+            {/* Active indicator */}
             {isActive && (
               <div className="absolute bottom-0 w-full h-[3px] bg-primaryGreen rounded-t-md" />
             )}
