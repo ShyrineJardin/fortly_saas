@@ -137,8 +137,8 @@ export default function BusinessSidebar() {
               >
                 {FaChevronRight ({size:20, className:"rotate-180"}) }
               </button>
-              <span className='text-sm font-medium'>
-                {isEditing ? 'Edit profile' : 'Business Profile'}
+              <span className='text-base font-semibold'>
+                {isEditing ? 'Edit Profile' : 'Business Profile'}
               </span>
               <button 
                 onClick={() => setIsEditing(!isEditing)}
@@ -169,7 +169,7 @@ export default function BusinessSidebar() {
             </div>
 
             {isEditing ? (
-              <div className='space-y-4'>
+              <div className='space-y-4  w-full'>
                 <div>
                   <label className='block text-xs font-medium text-gray-700 mb-1'>Business Name</label>
                   <input
