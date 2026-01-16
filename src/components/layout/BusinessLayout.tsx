@@ -1,6 +1,7 @@
 import React from 'react'
 import HeaderLogo from '../business/HeaderLogo'
 import BusinessHeader from '../business/BusinessHeader'
+import BusinessChat from '../business/BusinessChat'
 
 type Props = {
   sidebar?: React.ReactElement
@@ -35,16 +36,27 @@ export default function BusinessLayout({ sidebar, children, footer, showHeader, 
         )}
 
         {/* Main Content */}
-        <main className='flex-1 overflow-y-auto'>
+        <main className='flex-1 p-4 lg:p-6 overflow-y-auto'>
           {children}
         </main>
       </div>
+
+      {/* Render sidebar outside the aside for mobile modal */}
+      {sidebar && (
+        <div className='lg:hidden'>
+          {sidebar}
+        </div>
+      )}
       
       {footer && (
         <footer className='bg-footerBackground mt-auto'>
           {footer}
         </footer>
       )}
+
+      <BusinessChat />
+
     </div>
+
   )
 }

@@ -8,23 +8,23 @@ export default function BusinessTopTabs() {
   const location = useLocation()
 
   const tabs = [
-    { name: "Gallery", icon: FaImage, path: "/business" },
-    { name: "Services", icon: FiCalendar, path: "/" },
-    { name: "Reviews", icon: FaStar, path: "/reviews" }
+    { name: "Gallery", icon: FaImage, path: "/business/gallery" },
+    { name: "Services", icon: FiCalendar, path: "/business/services" },
+    { name: "Reviews", icon: FaStar, path: "/business/reviews" }
   ]
 
   // Determine active tab based on current path
   const getActiveTab = () => {
     const currentPath = location.pathname
-    if (currentPath.includes('/services')) return 'Services'
-    if (currentPath.includes('/reviews')) return 'Reviews'
+    if (currentPath.includes('/business/services')) return 'Services'
+    if (currentPath.includes('/business/reviews')) return 'Reviews'
     return 'Gallery'
   }
 
   const activeTab = getActiveTab()
 
   return (
-    <div className='flex justify-center gap-6 lg:gap-12 mb-4 lg:mb-6 border-b border-gray-100 w-full pt-6'>
+    <div className='flex justify-center gap-6 lg:gap-20 mb-4 lg:mb-6 border-b border-gray-100 w-full'>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.name
 

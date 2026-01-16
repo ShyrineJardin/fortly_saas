@@ -10,6 +10,10 @@ import LoginPage from './pages/business/LoginPage'
 import SignupPage from './pages/business/SignupPage'
 import OnboardingPage from './pages/business/OnboardingPage'
 import BusinessGalleryPage from './pages/business/BusinessGalleryPage'
+import BusinessReviewsPage from "./pages/business/BusinessReviewsPage"
+import BusinessServicePage from "./pages/business/BusinessServicePage"
+import BusinessChat from "./components/business/BusinessChat"
+
 
 export default function App() {
   return (
@@ -30,6 +34,11 @@ export default function App() {
         <Route path="/business/onboarding" element={<OnboardingPage />} />
         <Route path="/business" element={<Navigate to="/business/login" replace />} />
         <Route path="/business/gallery" element={<BusinessGalleryPage />} />
+        <Route path="/business/reviews" element={<BusinessReviewsPage />} />
+        <Route path="/business/services" element={<BusinessServicePage />} />
+        <Route path="/business/chat" element={<BusinessChat />} />
+
+
       </Routes>
     </BrowserRouter>
   )

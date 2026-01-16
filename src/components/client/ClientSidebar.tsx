@@ -85,16 +85,18 @@ export default function ClientSidebar() {
               </div>
             </div>
 
+            <div className='bg-white px-6 pb-4'>
+            <p className='text-sm text-center'>
+              {businessData.tagline}
+            </p>
+            </div>
+
             <button className='btn-primary max-w-xs'>
               <a href="/services">Book Now</a>
             </button>
           </div>
 
-          <div className='bg-white px-6 py-4'>
-            <p className='text-sm text-gray-600 text-center'>
-              {businessData.tagline}
-            </p>
-          </div>
+          
 
           <div className='bg-white mt-2'>
             <button
@@ -186,11 +188,11 @@ export default function ClientSidebar() {
         </div>
 
         <div className='mt-2 flex flex-col items-center justify-center text-textSecondary'>
-          <div className='flex flex-row mb-1 gap-2 items-center'>
+          <div className='flex flex-row mb-1 gap-2 items-center text-gray-700'>
             {BsFillTelephoneFill({className: 'text-sm'})}
             <p className='text-xs'>{businessData.phone}</p>
           </div>
-          <div className='flex flex-row mb-1 gap-2 items-center'>
+          <div className='flex flex-row mb-1 gap-2 items-center text-gray-700'>
             {MdEmail({className: 'text-sm'})}
             <p className='text-xs'>{businessData.email}</p>
           </div>

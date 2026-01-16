@@ -1,47 +1,127 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { IoClose, IoChevronBack, IoChevronForward } from 'react-icons/io5'
-import GalleryItem from '../shared/GalleryItem'; // Import the new shared component
+import { MdVideocam } from 'react-icons/md'
+
+interface GalleryItem {
+  id: number;
+  type: 'image' | 'video';
+  url: string;
+  uploadedAt: Date;
+}
+
+// Same store reference as BusinessGallery
+let galleryMedia: GalleryItem[] = [
+  { id: 1, type: 'image', url: 'https://picsum.photos/800/600?random=1', uploadedAt: new Date('2024-01-15') },
+  { id: 2, type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4', uploadedAt: new Date('2024-01-14') },
+  { id: 3, type: 'image', url: 'https://picsum.photos/600/800?random=2', uploadedAt: new Date('2024-01-13') },
+  { id: 4, type: 'image', url: 'https://picsum.photos/800/800?random=3', uploadedAt: new Date('2024-01-12') },
+  { id: 5, type: 'video', url: 'https://www.w3schools.com/html/movie.mp4', uploadedAt: new Date('2024-01-11') },
+  { id: 6, type: 'image', url: 'https://picsum.photos/800/600?random=4', uploadedAt: new Date('2024-01-10') },
+];
+
+const listeners = new Set<() => void>();
+
+const galleryStore = {
+  getMedia: () => [...galleryMedia].sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()),
+  
+  addMedia: (newMedia: GalleryItem) => {
+    galleryMedia = [newMedia, ...galleryMedia];
+    listeners.forEach(listener => listener());
+  },
+  
+  deleteMedia: (id: number) => {
+    galleryMedia = galleryMedia.filter(item => item.id !== id);
+    listeners.forEach(listener => listener());
+  },
+  
+  subscribe: (listener: () => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  }
+};
 
 export default function GalleryGrid() {
-  const [selectedIndex, setSelectedIndex] = useState(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(true);
-  const videoRef = useRef(null);
+  const [media, setMedia] = useState<GalleryItem[]>(galleryStore.getMedia());
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  const staticMedia = [
-    { type: 'image', url: 'https://picsum.photos/800/600?random=1' },
-    { type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4' },
-    { type: 'image', url: 'https://picsum.photos/600/800?random=2' },
-    { type: 'image', url: 'https://picsum.photos/800/800?random=3' },
-    { type: 'video', url: 'https://www.w3schools.com/html/movie.mp4' },
-    { type: 'image', url: 'https://picsum.photos/800/600?random=4' },
-  ];
+  useEffect(() => {
+    const unsubscribe = galleryStore.subscribe(() => {
+      setMedia(galleryStore.getMedia());
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
-  const handleNext = (e) => {
+  const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation(); 
-    setSelectedIndex((prev) => (prev !== null ? (prev + 1) % staticMedia.length : 0));
+    setSelectedIndex((prev) => (prev !== null ? (prev + 1) % media.length : 0));
   };
 
-  const handlePrev = (e) => {
+  const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation(); 
-    setSelectedIndex((prev) => (prev !== null ? (prev - 1 + staticMedia.length) % staticMedia.length : staticMedia.length - 1));
+    setSelectedIndex((prev) => (prev !== null ? (prev - 1 + media.length) % media.length : media.length - 1));
   };
 
-  const selectedMedia = selectedIndex !== null ? staticMedia[selectedIndex] : null;
+  const formatDate = (date: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+    return date.toLocaleDateString();
+  };
+
+  const selectedMedia = selectedIndex !== null ? media[selectedIndex] : null;
 
   return (
     <div className="relative p-4">
-      {/* 1. Grid View using Shared GalleryItem */}
+      {/* Grid View */}
       <div className="columns-2 sm:columns-3 md:columns-4 gap-2 space-y-2">
-        {staticMedia.map((item, i) => (
-          <GalleryItem 
-            key={i} 
-            item={item} 
-            onClick={() => setSelectedIndex(i)} 
-          />
+        {media.map((item, i) => (
+          <div 
+            key={item.id}
+            onClick={() => setSelectedIndex(i)}
+            className="bg-gray-200 rounded-xl overflow-hidden break-inside-avoid cursor-pointer hover:opacity-90 transition-all group relative"
+          >
+            {item.type === 'video' ? (
+              <video 
+                src={item.url} 
+                className="w-full h-auto object-cover" 
+                muted 
+                autoPlay 
+                loop 
+                playsInline
+              />
+            ) : (
+              <img 
+                src={item.url} 
+                alt="Gallery post" 
+                className="w-full h-auto object-cover" 
+              />
+            )}
+            
+            {/* Upload date overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+              <p className="text-white text-xs">{formatDate(item.uploadedAt)}</p>
+            </div>
+
+            {/* Video indicator */}
+            {item.type === 'video' && (
+              <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded">
+                {MdVideocam ({size:20})} 
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
-      {/* 2. Lightbox Modal */}
+      {/* Lightbox Modal */}
       {selectedMedia && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4"
@@ -51,14 +131,14 @@ export default function GalleryGrid() {
             className="absolute top-4 right-4 text-white text-3xl z-50 hover:scale-110 transition-transform"
             onClick={() => setSelectedIndex(null)}
           >
-            {IoClose({})}
+            {IoClose ({})}
           </button>
 
           <button 
             onClick={handlePrev}
             className="absolute left-2 md:left-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
           >
-            {IoChevronBack({})}
+            {IoChevronBack ({})}
           </button>
 
           <div 
@@ -84,13 +164,18 @@ export default function GalleryGrid() {
                 alt="Large view"
               />
             )}
+            
+            {/* Upload date in lightbox */}
+            <div className="mt-4 text-white text-sm">
+              Uploaded: {formatDate(selectedMedia.uploadedAt)}
+            </div>
           </div>
 
           <button 
             onClick={handleNext}
             className="absolute right-2 md:right-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
           >
-            {IoChevronForward({})}
+            {IoChevronForward ({})}
           </button>
         </div>
       )}

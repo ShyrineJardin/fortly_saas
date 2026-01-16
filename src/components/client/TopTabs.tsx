@@ -24,7 +24,7 @@ export default function TopTabs() {
   const activeTab = getActiveTab()
 
   return (
-    <div className='flex justify-center gap-6 lg:gap-12 mb-4 lg:mb-6 border-b border-gray-100 w-full'>
+    <div className='flex justify-center gap-6 lg:gap-20 mb-4 lg:mb-6 border-b border-gray-100 w-full'>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.name
 
