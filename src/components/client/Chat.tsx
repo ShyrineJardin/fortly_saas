@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { IoChatbubbleEllipsesOutline, IoClose, IoSend, IoImageOutline } from "react-icons/io5";
 import { FaAngleDown, FaChevronLeft } from 'react-icons/fa6'
 
@@ -10,9 +10,13 @@ export default function ChatWidget() {
       id: 1,
       sender: "business",
       text: "Lorem ipsum dolor sit amet.",
-      time: "10:30 AM"
+      time: "10:30 AM",
+      type: null,
+      content: undefined,
+      fileName: undefined
     }
   ]);
+  const fileInputRef = useRef(null);
 
   // Listen for open chat event from mobile header
   useEffect(() => {
@@ -20,6 +24,36 @@ export default function ChatWidget() {
     window.addEventListener('openChat', handleOpenChat);
     return () => window.removeEventListener('openChat', handleOpenChat);
   }, []);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const fileType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : null;
+      
+      if (fileType) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const result = event.target?.result;
+          if (result && typeof result === 'string') {
+            setMessages([
+              ...messages,
+              {
+                id: messages.length + 1,
+                sender: "user",
+                type: fileType,
+                content: result,
+                fileName: file.name,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                text: undefined
+              }
+            ]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+    e.target.value = '';
+  };
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -29,7 +63,10 @@ export default function ChatWidget() {
           id: messages.length + 1,
           sender: "user",
           text: message,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          type: null,
+          content: undefined,
+          fileName: undefined
         }
       ]);
       setMessage("");
@@ -43,8 +80,37 @@ export default function ChatWidget() {
     }
   };
 
+  const renderMessage = (msg) => {
+    if (msg.type === 'image') {
+      return (
+        <img 
+          src={msg.content} 
+          alt={msg.fileName}
+          className="max-w-full rounded-lg"
+        />
+      );
+    } else if (msg.type === 'video') {
+      return (
+        <video 
+          src={msg.content} 
+          controls
+          className="max-w-full rounded-lg"
+        />
+      );
+    }
+    return <p className="text-sm">{msg.text}</p>;
+  };
+
   return (
     <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
       {/* DESKTOP CHAT WIDGET */}
       <div className="hidden lg:block fixed bottom-6 right-6 z-50">
         {/* Chat Window */}
@@ -78,7 +144,7 @@ export default function ChatWidget() {
                         : "bg-white border border-gray-200"
                     }`}
                   >
-                    <p className="text-sm">{msg.text}</p>
+                    {renderMessage(msg)}
                   </div>
                 </div>
               ))}
@@ -87,6 +153,12 @@ export default function ChatWidget() {
             {/* Chat Input */}
             <div className="p-4 bg-white border-t border-gray-200">
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  {IoImageOutline({ size: 20 })}
+                </button>
                 <input
                   type="text"
                   value={message}
@@ -145,7 +217,7 @@ export default function ChatWidget() {
                       : "bg-white border border-gray-200"
                   }`}
                 >
-                  <p className="text-sm">{msg.text}</p>
+                  {renderMessage(msg)}
                 </div>
               </div>
             ))}
@@ -154,7 +226,10 @@ export default function ChatWidget() {
           {/* Mobile Input Area */}
           <div className="bg-white border-t border-gray-200 px-4 py-3">
             <div className="flex items-center gap-2">
-              <button className="p-2 text-gray-500">
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 text-gray-500"
+              >
                 {IoImageOutline({ size: 24 })}
               </button>
               <input

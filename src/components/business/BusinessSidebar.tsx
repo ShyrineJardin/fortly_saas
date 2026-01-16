@@ -444,7 +444,7 @@ export default function BusinessSidebar() {
             <div className='px-6 pb-6'>
               <button 
                 onClick={handleSave}
-                className='w-full bg-emerald-400 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg mt-6 transition duration-200'
+                className='btn-primary w-full'
               >
                 Save
               </button>
@@ -754,7 +754,7 @@ export default function BusinessSidebar() {
         {isEditing && (
           <button 
             onClick={handleSave}
-            className='w-full bg-emerald-400 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg mt-8 transition duration-200'
+            className='w-full btn-primary mt-8'
           >
             Save
           </button>
