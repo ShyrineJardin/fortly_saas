@@ -1,5 +1,6 @@
 import React from 'react'
-import ChatWidget from '../client/Chat'
+import ChatWidget from '../client/Chat' 
+import { useParams } from 'react-router-dom'
 
 type Props = {
   sidebar: React.ReactElement
@@ -8,20 +9,18 @@ type Props = {
 }
 
 export default function ClientLayout({ sidebar, children, footer }: Props) {
+  const { businessSlug } = useParams()
+  
   return (
     <div className='flex flex-col min-h-screen'>
-      {/* Mobile header only - rendered by sidebar component */}
       <div className='lg:hidden'>
         {sidebar}
       </div>
       
       <div className='flex flex-1'>
-        {/* Desktop Sidebar - Only visible on desktop */}
         <aside className='hidden lg:block w-80 p-6 overflow-y-auto'>
           {sidebar}
         </aside>
-
-        {/* Main Content */}
         <main className='flex-1 p-4 lg:p-6 overflow-y-auto'>
           {children}
         </main>
@@ -33,8 +32,10 @@ export default function ClientLayout({ sidebar, children, footer }: Props) {
         </footer>
       )}
 
-      {/* Chat Widget - visible on all pages using ClientLayout */}
-      <ChatWidget />
+      <ChatWidget 
+        businessSlug={businessSlug || ""} 
+        apiBaseUrl={process.env.REACT_APP_API_URL || "http://localhost:5000/api"}
+      />
     </div>
   )
 }

@@ -1,100 +1,162 @@
 import React, { useState, useEffect, useRef } from "react";
 import { IoChatbubbleEllipsesOutline, IoClose, IoSend, IoImageOutline, IoSearch } from "react-icons/io5";
 import { FaAngleDown, FaChevronLeft } from 'react-icons/fa6';
+import axios from 'axios';
 
-export default function BusinessChat() {
+interface Client {
+  id: number;
+  clientName: string;
+  clientEmail: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unread: number;
+}
+
+interface Message {
+  id: string | number;
+  sender: "business" | "client";
+  text?: string;
+  message?: string;
+  time: string;
+  type?: 'image' | 'video' | null;
+  content?: string;
+  fileName?: string;
+  createdAt?: string;
+}
+
+interface BusinessChatProps {
+  businessSlug: string;
+  apiBaseUrl?: string;
+}
+
+export default function BusinessChat({ 
+  businessSlug,
+  apiBaseUrl = 'http://localhost:5000/api' 
+}: BusinessChatProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeChat, setActiveChat] = useState(null);
+  const [activeChat, setActiveChat] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const fileInputRef = useRef(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ [key: string]: Message[] }>({});
+  const [isLoadingClients, setIsLoadingClients] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [zoomedMedia, setZoomedMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Sample client data
-  const [clients] = useState([
-    {
-      id: 1,
-      name: "John Doe",
-      email: "john.doe@gmail.com",
-      lastMessage: "Thanks for the update!",
-      time: "10:30 AM",
-      unread: 2,
-      avatar: "JD"
-    },
-    {
-      id: 2,
-      name: "Sarah Smith",
-      email: "sarah.smith@gmail.com",
-      lastMessage: "When can we schedule a meeting?",
-      time: "Yesterday",
-      unread: 0,
-      avatar: "SS"
-    },
-    {
-      id: 3,
-      name: "Mike Johnson",
-      email: "mike.j@gmail.com",
-      lastMessage: "Perfect, see you then!",
-      time: "Monday",
-      unread: 1,
-      avatar: "MJ"
-    },
-    {
-      id: 4,
-      name: "Emily Davis",
-      email: "emily.davis@gmail.com",
-      lastMessage: "I have a question about the invoice",
-      time: "2 days ago",
-      unread: 0,
-      avatar: "ED"
+  // Load clients when chat opens
+  useEffect(() => {
+    if (isOpen) {
+      loadClients();
     }
-  ]);
+  }, [isOpen]);
 
-  // Sample messages for each client
-  const [chatMessages, setChatMessages] = useState({
-    1: [
-      { id: 1, sender: "client", text: "Hi, I need help with my order", time: "10:15 AM" },
-      { id: 2, sender: "business", text: "Hello! I'd be happy to help. What's your order number?", time: "10:20 AM" },
-      { id: 3, sender: "client", text: "Thanks for the update!", time: "10:30 AM" }
-    ],
-    2: [
-      { id: 1, sender: "client", text: "When can we schedule a meeting?", time: "Yesterday" }
-    ],
-    3: [
-      { id: 1, sender: "business", text: "How about tomorrow at 2pm?", time: "Monday" },
-      { id: 2, sender: "client", text: "Perfect, see you then!", time: "Monday" }
-    ],
-    4: [
-      { id: 1, sender: "client", text: "I have a question about the invoice", time: "2 days ago" }
-    ]
-  });
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, activeChat]);
 
+  // Listen for open chat event
   useEffect(() => {
     const handleOpenChat = () => setIsOpen(true);
     window.addEventListener('openChat', handleOpenChat);
     return () => window.removeEventListener('openChat', handleOpenChat);
   }, []);
 
-  const handleFileSelect = (e) => {
+  // Load all clients for this business
+  const loadClients = async () => {
+    setIsLoadingClients(true);
+    try {
+    console.log('🔍 Loading clients for businessSlug:', businessSlug);
+    console.log('🔍 API URL:', `${apiBaseUrl}/chat/clients/${businessSlug}`);
+    
+    const response = await axios.get(`${apiBaseUrl}/chat/clients/${businessSlug}`);
+    
+    console.log('✅ Clients response:', response.data);
+    console.log('✅ Clients array:', response.data.clients);
+    
+    setClients(response.data.clients || []);
+  } catch (error) {
+    console.error('❌ Error loading clients:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('❌ Response data:', error.response?.data);
+      console.error('❌ Response status:', error.response?.status);
+    }
+  } finally {
+    setIsLoadingClients(false);
+  }
+  };
+
+  // Load messages for a specific client
+  const loadMessages = async (clientEmail: string) => {
+    setIsLoadingMessages(true);
+    try {
+    console.log('🔍 Loading messages for:', clientEmail);
+    console.log('🔍 API URL:', `${apiBaseUrl}/chat/messages/business/${businessSlug}/${clientEmail}`);
+    
+    const response = await axios.get(
+      `${apiBaseUrl}/chat/messages/business/${businessSlug}/${clientEmail}`
+    );
+    
+    console.log('✅ Messages response:', response.data);
+    console.log('✅ Messages array:', response.data.messages);
+    
+    const formattedMessages = response.data.messages.map((msg: any) => ({
+      id: msg.id,
+      sender: msg.sender,
+      text: msg.message,
+      time: new Date(msg.createdAt).toLocaleTimeString([], { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }),
+      type: msg.messageType || null,
+      content: msg.fileContent,
+      fileName: msg.fileName
+    }));
+    
+    console.log('✅ Formatted messages:', formattedMessages);
+    
+    setChatMessages(prev => ({
+      ...prev,
+      [clientEmail]: formattedMessages
+    }));
+  } catch (error) {
+    console.error('❌ Error loading messages:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('❌ Response data:', error.response?.data);
+      console.error('❌ Response status:', error.response?.status);
+    }
+  } finally {
+    setIsLoadingMessages(false);
+  }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && activeChat) {
-      const fileType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : null;
+      const fileType = file.type.startsWith('image/') ? 'image' : 
+                      file.type.startsWith('video/') ? 'video' : null;
       
       if (fileType) {
         const reader = new FileReader();
-        reader.onload = (event) => {
-          const newMessage = {
-            id: (chatMessages[activeChat]?.length || 0) + 1,
-            sender: "business",
-            type: fileType,
-            content: event.target.result,
-            fileName: file.name,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-          
-          setChatMessages({
-            ...chatMessages,
-            [activeChat]: [...(chatMessages[activeChat] || []), newMessage]
-          });
+        reader.onload = async (event) => {
+          const result = event.target?.result;
+          if (result && typeof result === 'string') {
+            try {
+              await axios.post(`${apiBaseUrl}/chat/send-business`, {
+                businessSlug,
+                clientEmail: activeChat,
+                message: file.name,
+                messageType: fileType,
+                fileContent: result
+              });
+              
+              await loadMessages(activeChat);
+            } catch (error) {
+              console.error('Error sending file:', error);
+            }
+          }
         };
         reader.readAsDataURL(file);
       }
@@ -102,32 +164,33 @@ export default function BusinessChat() {
     e.target.value = '';
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (message.trim() && activeChat) {
-      const newMessage = {
-        id: (chatMessages[activeChat]?.length || 0) + 1,
-        sender: "business",
-        text: message,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      
-      setChatMessages({
-        ...chatMessages,
-        [activeChat]: [...(chatMessages[activeChat] || []), newMessage]
-      });
-      setMessage("");
+      try {
+        await axios.post(`${apiBaseUrl}/chat/send-business`, {
+          businessSlug,
+          clientEmail: activeChat,
+          message: message.trim()
+        });
+        
+        setMessage("");
+        await loadMessages(activeChat);
+      } catch (error) {
+        console.error('Error sending message:', error);
+      }
     }
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
-  const openClientChat = (clientId) => {
-    setActiveChat(clientId);
+  const openClientChat = async (clientEmail: string) => {
+    setActiveChat(clientEmail);
+    await loadMessages(clientEmail);
   };
 
   const closeChat = () => {
@@ -135,20 +198,30 @@ export default function BusinessChat() {
   };
 
   const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchQuery.toLowerCase())
+    client.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    client.clientEmail.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeClient = clients.find(c => c.id === activeChat);
-  const currentMessages = chatMessages[activeChat] || [];
+  const activeClient = clients.find(c => c.clientEmail === activeChat);
+  const currentMessages = chatMessages[activeChat || ''] || [];
 
-  const renderMessage = (msg) => {
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const renderMessage = (msg: Message) => {
     if (msg.type === 'image') {
       return (
         <img 
           src={msg.content} 
           alt={msg.fileName}
-          className="max-w-full rounded-lg"
+          className="max-w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => setZoomedMedia({ type: 'image', src: msg.content || '' })}
         />
       );
     } else if (msg.type === 'video') {
@@ -156,11 +229,12 @@ export default function BusinessChat() {
         <video 
           src={msg.content} 
           controls
-          className="max-w-full rounded-lg"
+          className="max-w-full rounded-lg cursor-pointer"
+          onClick={() => setZoomedMedia({ type: 'video', src: msg.content || '' })}
         />
       );
     }
-    return <p className="text-sm">{msg.text}</p>;
+    return <p className="text-sm">{msg.text || msg.message}</p>;
   };
 
   return (
@@ -172,6 +246,39 @@ export default function BusinessChat() {
         onChange={handleFileSelect}
         className="hidden"
       />
+
+      {/* MEDIA ZOOM MODAL */}
+      {zoomedMedia && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 z-[100] flex items-center justify-center p-4"
+          onClick={() => setZoomedMedia(null)}
+        >
+          <button
+            onClick={() => setZoomedMedia(null)}
+            className="absolute top-4 right-4 text-white text-3xl hover:text-gray-300 z-10"
+          >
+            ×
+          </button>
+          <div className="max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center">
+            {zoomedMedia.type === 'image' ? (
+              <img 
+                src={zoomedMedia.src} 
+                alt="Zoomed"
+                className="max-w-full max-h-full object-contain rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <video 
+                src={zoomedMedia.src} 
+                controls
+                className="max-w-full max-h-full rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+                autoPlay
+              />
+            )}
+          </div>
+        </div>
+      )}
 
       {/* DESKTOP CHAT WIDGET */}
       <div className="hidden lg:block fixed bottom-6 right-6 z-50">
@@ -187,14 +294,14 @@ export default function BusinessChat() {
                     onClick={() => setIsOpen(false)}
                     className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                   >
-                      {FaAngleDown({ size: 20, className: "text-gray-600" })}
+                    {FaAngleDown ({size:20, className:"text-gray-600"})}
                   </button>
                 </div>
 
                 {/* Search Bar */}
                 <div className="p-3 border-b border-gray-200">
                   <div className="relative">
-                    {IoSearch({ className: "absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400", size: 18 })}
+                    {IoSearch ({className:"absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400", size:18})}
                     <input
                       type="text"
                       value={searchQuery}
@@ -207,32 +314,42 @@ export default function BusinessChat() {
 
                 {/* Client List */}
                 <div className="h-96 overflow-y-auto">
-                  {filteredClients.map((client) => (
-                    <div
-                      key={client.id}
-                      onClick={() => openClientChat(client.id)}
-                      className="p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-primaryGreen text-white rounded-full flex items-center justify-center font-semibold flex-shrink-0">
-                          {client.avatar}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-semibold text-sm truncate">{client.name}</h3>
-                            <span className="text-xs text-gray-500 ml-2">{client.time}</span>
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">{client.email}</p>
-                          <p className="text-xs text-gray-600 truncate mt-1">{client.lastMessage}</p>
-                        </div>
-                        {client.unread > 0 && (
-                          <div className="w-5 h-5 bg-primaryGreen text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                            {client.unread}
-                          </div>
-                        )}
-                      </div>
+                  {isLoadingClients ? (
+                    <div className="flex justify-center items-center h-full">
+                      <p className="text-gray-500">Loading clients...</p>
                     </div>
-                  ))}
+                  ) : filteredClients.length === 0 ? (
+                    <div className="flex justify-center items-center h-full">
+                      <p className="text-gray-500 text-sm">No conversations yet</p>
+                    </div>
+                  ) : (
+                    filteredClients.map((client) => (
+                      <div
+                        key={client.clientEmail}
+                        onClick={() => openClientChat(client.clientEmail)}
+                        className="p-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-primaryGreen text-white rounded-full flex items-center justify-center font-semibold flex-shrink-0">
+                            {getInitials(client.clientName)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <h3 className="font-semibold text-sm truncate">{client.clientName}</h3>
+                              <span className="text-xs text-gray-500 ml-2">{client.lastMessageTime}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 truncate">{client.clientEmail}</p>
+                            <p className="text-xs text-gray-600 truncate mt-1">{client.lastMessage}</p>
+                          </div>
+                          {client.unread > 0 && (
+                            <div className="w-5 h-5 bg-primaryGreen text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                              {client.unread}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </>
             ) : (
@@ -244,35 +361,46 @@ export default function BusinessChat() {
                       onClick={closeChat}
                       className="p-1 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
                     >
-                      {FaChevronLeft({ size: 18, className: "text-gray-600" })}
+                      {FaChevronLeft ({size:18, className:"text-gray-600"})}
                     </button>
                     <div className="w-10 h-10 bg-primaryGreen text-white rounded-full flex items-center justify-center font-semibold flex-shrink-0">
-                      {activeClient?.avatar}
+                      {activeClient && getInitials(activeClient.clientName)}
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-sm truncate">{activeClient?.name}</h3>
-                      <p className="text-xs text-gray-500 truncate">{activeClient?.email}</p>
+                      <h3 className="font-semibold text-sm truncate">{activeClient?.clientName}</h3>
+                      <p className="text-xs text-gray-500 truncate">{activeClient?.clientEmail}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="h-96 overflow-y-auto p-4 bg-gray-50">
-                  {currentMessages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`mb-3 flex ${msg.sender === "business" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-                          msg.sender === "business"
-                            ? "bg-primaryGreen text-white"
-                            : "bg-white border border-gray-200"
-                        }`}
-                      >
-                        {renderMessage(msg)}
-                      </div>
+                  {isLoadingMessages ? (
+                    <div className="flex justify-center items-center h-full">
+                      <p className="text-gray-500">Loading messages...</p>
                     </div>
-                  ))}
+                  ) : currentMessages.length === 0 ? (
+                    <div className="flex justify-center items-center h-full">
+                      <p className="text-gray-500 text-sm">Start the conversation!</p>
+                    </div>
+                  ) : (
+                    currentMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`mb-3 flex ${msg.sender === "business" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                            msg.sender === "business"
+                              ? "bg-primaryGreen text-white"
+                              : "bg-white border border-gray-200"
+                          }`}
+                        >
+                          {renderMessage(msg)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
                 </div>
 
                 <div className="p-4 bg-white border-t border-gray-200">
@@ -281,7 +409,7 @@ export default function BusinessChat() {
                       onClick={() => fileInputRef.current?.click()}
                       className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
                     >
-                      {IoImageOutline({ size: 20 })}
+                      {IoImageOutline ({size:20})} 
                     </button>
                     <input
                       type="text"
@@ -295,7 +423,7 @@ export default function BusinessChat() {
                       onClick={handleSendMessage}
                       className="p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors"
                     >
-                      {IoSend({ size: 20 })}
+                    {IoSend ({size:20})} 
                     </button>
                   </div>
                 </div>
@@ -310,7 +438,7 @@ export default function BusinessChat() {
             onClick={() => setIsOpen(true)}
             className="bg-primaryGreen text-white p-4 rounded-full shadow-lg hover:bg-hoverGreen transition-colors"
           >
-            {IoChatbubbleEllipsesOutline({ size: 25 })}
+            {IoChatbubbleEllipsesOutline ({size:25})}
           </button>
         )}
       </div>
@@ -325,11 +453,11 @@ export default function BusinessChat() {
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-semibold text-lg">Messages</h2>
                   <button onClick={() => setIsOpen(false)} className="p-2">
-                    {IoClose({ size: 24 })}
+                    {IoClose ({size:24})} 
                   </button>
                 </div>
                 <div className="relative">
-                  {IoSearch({ className: "absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400", size: 18 })}
+                  {IoSearch ({className:"absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400", size:18})}
                   <input
                     type="text"
                     value={searchQuery}
@@ -341,32 +469,42 @@ export default function BusinessChat() {
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {filteredClients.map((client) => (
-                  <div
-                    key={client.id}
-                    onClick={() => openClientChat(client.id)}
-                    className="p-4 hover:bg-gray-50 active:bg-gray-100 cursor-pointer border-b border-gray-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-14 h-14 bg-primaryGreen text-white rounded-full flex items-center justify-center font-semibold text-lg flex-shrink-0">
-                        {client.avatar}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-semibold text-base truncate">{client.name}</h3>
-                          <span className="text-xs text-gray-500 ml-2">{client.time}</span>
-                        </div>
-                        <p className="text-xs text-gray-500 truncate">{client.email}</p>
-                        <p className="text-sm text-gray-600 truncate mt-1">{client.lastMessage}</p>
-                      </div>
-                      {client.unread > 0 && (
-                        <div className="w-6 h-6 bg-primaryGreen text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                          {client.unread}
-                        </div>
-                      )}
-                    </div>
+                {isLoadingClients ? (
+                  <div className="flex justify-center items-center h-full">
+                    <p className="text-gray-500">Loading clients...</p>
                   </div>
-                ))}
+                ) : filteredClients.length === 0 ? (
+                  <div className="flex justify-center items-center h-full">
+                    <p className="text-gray-500 text-sm">No conversations yet</p>
+                  </div>
+                ) : (
+                  filteredClients.map((client) => (
+                    <div
+                      key={client.clientEmail}
+                      onClick={() => openClientChat(client.clientEmail)}
+                      className="p-4 hover:bg-gray-50 active:bg-gray-100 cursor-pointer border-b border-gray-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-14 h-14 bg-primaryGreen text-white rounded-full flex items-center justify-center font-semibold text-lg flex-shrink-0">
+                          {getInitials(client.clientName)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="font-semibold text-base truncate">{client.clientName}</h3>
+                            <span className="text-xs text-gray-500 ml-2">{client.lastMessageTime}</span>
+                          </div>
+                          <p className="text-xs text-gray-500 truncate">{client.clientEmail}</p>
+                          <p className="text-sm text-gray-600 truncate mt-1">{client.lastMessage}</p>
+                        </div>
+                        {client.unread > 0 && (
+                          <div className="w-6 h-6 bg-primaryGreen text-white rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                            {client.unread}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </>
           ) : (
@@ -375,35 +513,46 @@ export default function BusinessChat() {
               <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0">
                 <div className="flex items-center gap-3">
                   <button onClick={closeChat} className="p-2 -ml-2">
-                    {FaChevronLeft({ size: 20 })}
+                    {FaChevronLeft ({size:20})}
                   </button>
                   <div className="w-10 h-10 bg-primaryGreen text-white rounded-full flex items-center justify-center font-semibold flex-shrink-0">
-                    {activeClient?.avatar}
+                    {activeClient && getInitials(activeClient.clientName)}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-base truncate">{activeClient?.name}</h3>
-                    <p className="text-xs text-gray-500 truncate">{activeClient?.email}</p>
+                    <h3 className="font-semibold text-base truncate">{activeClient?.clientName}</h3>
+                    <p className="text-xs text-gray-500 truncate">{activeClient?.clientEmail}</p>
                   </div>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-                {currentMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`mb-4 flex ${msg.sender === "business" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-                        msg.sender === "business"
-                          ? "bg-primaryGreen text-white"
-                          : "bg-white border border-gray-200"
-                      }`}
-                    >
-                      {renderMessage(msg)}
-                    </div>
+                {isLoadingMessages ? (
+                  <div className="flex justify-center items-center h-full">
+                    <p className="text-gray-500">Loading messages...</p>
                   </div>
-                ))}
+                ) : currentMessages.length === 0 ? (
+                  <div className="flex justify-center items-center h-full">
+                    <p className="text-gray-500 text-sm">Start the conversation!</p>
+                  </div>
+                ) : (
+                  currentMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`mb-4 flex ${msg.sender === "business" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                          msg.sender === "business"
+                            ? "bg-primaryGreen text-white"
+                            : "bg-white border border-gray-200"
+                        }`}
+                      >
+                        {renderMessage(msg)}
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div ref={messagesEndRef} />
               </div>
 
               <div className="bg-white border-t border-gray-200 px-4 py-3">
@@ -412,7 +561,7 @@ export default function BusinessChat() {
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2 text-gray-500"
                   >
-                    {IoImageOutline ({size:24})}
+                    {IoImageOutline ({size:24})} 
                   </button>
                   <input
                     type="text"
@@ -426,7 +575,7 @@ export default function BusinessChat() {
                     onClick={handleSendMessage}
                     className="p-2 text-primaryGreen"
                   >
-                    {IoSend({ size: 24 })}
+                    {IoSend ({size:24})} 
                   </button>
                 </div>
               </div>

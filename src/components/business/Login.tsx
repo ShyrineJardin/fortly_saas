@@ -20,6 +20,12 @@ export default function Login() {
     try {
       const response = await authAPI.login(formData);
       setAuthToken(response.data.token);
+
+      // ✅ SAVE BUSINESS SLUG TO LOCALSTORAGE
+      if (response.data.business.slug) {
+        localStorage.setItem('businessSlug', response.data.business.slug);
+        console.log('✅ Saved businessSlug:', response.data.business.slug);
+      }
       
       // Navigate based on onboarding status
       if (response.data.business.onboardingCompleted) {

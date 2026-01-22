@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import HeaderLogo from '../business/HeaderLogo'
 import BusinessHeader from '../business/BusinessHeader'
 import BusinessChat from '../business/BusinessChat'
@@ -12,36 +12,40 @@ type Props = {
 }
 
 export default function BusinessLayout({ sidebar, children, footer, showHeader, showBusinessHeader }: Props) {
+  const [businessSlug, setBusinessSlug] = useState<string>('')
+
+  useEffect(() => {
+    const slug = localStorage.getItem('businessSlug')
+    console.log('🔍 BusinessSlug from localStorage:', slug)
+    if (slug) {
+      setBusinessSlug(slug)
+    }
+  }, [])
+  
   return (
     <div className='flex flex-col min-h-screen'>
-      {/* Header - can be toggled */}
       {showHeader && <HeaderLogo />}
       
-      {/* Mobile header from sidebar if provided */}
       {sidebar && (
         <div className='lg:hidden'>
           {sidebar}
         </div>
       )}
 
-      {/* Business Header  */}
       {showBusinessHeader && <BusinessHeader />}
       
       <div className='flex flex-1'>
-        {/* Desktop Sidebar - Only visible on desktop if provided */}
         {sidebar && (
           <aside className='hidden lg:block w-80 p-6 overflow-y-auto'>
             {sidebar}
           </aside>
         )}
 
-        {/* Main Content */}
         <main className='flex-1 p-4 lg:p-6 overflow-y-auto'>
           {children}
         </main>
       </div>
 
-      {/* Render sidebar outside the aside for mobile modal */}
       {sidebar && (
         <div className='lg:hidden'>
           {sidebar}
@@ -54,9 +58,12 @@ export default function BusinessLayout({ sidebar, children, footer, showHeader, 
         </footer>
       )}
 
-      <BusinessChat />
-
+      {businessSlug && (
+        <BusinessChat
+          businessSlug={businessSlug} 
+          apiBaseUrl={process.env.REACT_APP_API_URL || "http://localhost:5000/api"}
+        />
+      )}
     </div>
-
   )
 }

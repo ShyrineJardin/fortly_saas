@@ -67,7 +67,6 @@ export default function App() {
           <Route path="gallery" element={<BusinessGallery />} />
           <Route path="reviews" element={<BusinessReviewsPage />} />
           <Route path="services" element={<BusinessServicePage />} />
-          <Route path="chat" element={<BusinessChat />} />
         </Route>
 
         {/* Client Routes - WITH SHARED LAYOUT */}
@@ -78,7 +77,6 @@ export default function App() {
           <Route path="reviews" element={<ReviewsPage />} />
           <Route path="booking" element={<BookingPage />} />
           <Route path="confirmation" element={<ConfirmationPage />} />
-          <Route path="chat" element={<Chat />} />
         </Route>
 
         {/* Default redirect */}
