@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom';
+import { authAPI, setAuthToken } from '../../utils/api';
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
@@ -6,14 +8,33 @@ export default function Login() {
     email: '',
     password: ''
   })
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault()
-    console.log('Login submitted:', formData)
-    // Add your authentication logic here
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const response = await authAPI.login(formData);
+      setAuthToken(response.data.token);
+      
+      // Navigate based on onboarding status
+      if (response.data.business.onboardingCompleted) {
+        navigate('/business/gallery');
+      } else {
+        navigate('/business/onboarding');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -28,6 +49,7 @@ export default function Login() {
         <div className='flex flex-col text-center'>
           <h2 className="lg:text-3xl text-2xl font-semibold "> Welcome back👋</h2>
           <p className="text-textSecondaryColor lg:text-base text-sm mb-6">Your portfolio. Your bookings. All in one.</p>
+            
 
           <div className="space-y-5 text-start">
             {/* Email Input */}
@@ -43,6 +65,7 @@ export default function Login() {
                 onChange={handleChange}
                 placeholder="Enter email address"
                 className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={loading}
               />
             </div>
 
@@ -60,11 +83,13 @@ export default function Login() {
                   onChange={handleChange}
                   placeholder="Enter password"
                   className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent pr-12"
+                  disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  disabled={loading}
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,6 +111,7 @@ export default function Login() {
                 <input
                   type="checkbox"
                   className="w-4 h-4 text-emerald-500 border-gray-300 rounded focus:ring-emerald-500"
+                  disabled={loading}
                 />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
@@ -94,12 +120,20 @@ export default function Login() {
               </a>
             </div>
 
+            {/* Error Message*/}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-left">
+                {error}
+              </div>
+            )}
+
             {/* Submit Button */}
             <button
               onClick={handleSubmit}
-              className="btn-primary w-full mt-2"
+              disabled={loading}
+              className="btn-primary w-full mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In
+              {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </div>
 
@@ -113,7 +147,8 @@ export default function Login() {
           {/* Google Sign In */}
           <button
             type="button"
-            className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-3xl transition duration-200 flex items-center justify-center gap-3"
+            className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-3xl transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M19.8 10.2273C19.8 9.51821 19.7364 8.83639 19.6182 8.18185H10.2V12.0501H15.5818C15.3364 13.3001 14.6182 14.3592 13.5455 15.0682V17.5773H16.8182C18.7091 15.8364 19.8 13.2728 19.8 10.2273Z" fill="#4285F4"/>

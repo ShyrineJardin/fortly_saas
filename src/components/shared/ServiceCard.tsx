@@ -9,15 +9,24 @@ interface ServiceProps {
   duration: string;
   price: string;
   description: string;
+  image?: string;
   showArrow?: boolean;
 }
 
-export default function ServiceCard({ id, title, duration, price, description, showArrow = false }: ServiceProps) {
+export default function ServiceCard({ 
+  id, 
+  title, 
+  duration, 
+  price, 
+  description, 
+  image,
+  showArrow = false 
+}: ServiceProps) {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate(); 
 
   const handleBooking = () => {
-    const serviceData = { id, title, duration, price, description };
+    const serviceData = { id, title, duration, price, description, image };
     navigate("/booking", { state: { selectedService: serviceData } });
   };
 
@@ -25,7 +34,15 @@ export default function ServiceCard({ id, title, duration, price, description, s
     <div className="bg-white border border-border rounded-2xl lg:p-4 p-2 shadow-sm mb-4">
       <div className="flex items-center justify-between">
         <div className="flex items-start gap-4">
-          <div className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0" />
+          {image ? (
+            <img 
+              src={image}
+              alt={title}
+              className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0 object-cover" 
+            />
+          ) : (
+            <div className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0" />
+          )}
           
           <div>
             <h3 className="lg:text-base text-sm font-semibold">{title}</h3>

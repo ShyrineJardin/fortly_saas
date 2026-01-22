@@ -1,59 +1,39 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { IoClose, IoChevronBack, IoChevronForward } from 'react-icons/io5'
 import { MdVideocam } from 'react-icons/md'
+import { galleryAPI } from '../../utils/api'
+import { useParams } from 'react-router-dom'
 
 interface GalleryItem {
-  id: number;
-  type: 'image' | 'video';
-  url: string;
-  uploadedAt: Date;
+  id: string;
+  mediaType: 'image' | 'video';
+  mediaUrl: string;
+  caption?: string;
+  order: number;
 }
 
-// Same store reference as BusinessGallery
-let galleryMedia: GalleryItem[] = [
-  { id: 1, type: 'image', url: 'https://picsum.photos/800/600?random=1', uploadedAt: new Date('2024-01-15') },
-  { id: 2, type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4', uploadedAt: new Date('2024-01-14') },
-  { id: 3, type: 'image', url: 'https://picsum.photos/600/800?random=2', uploadedAt: new Date('2024-01-13') },
-  { id: 4, type: 'image', url: 'https://picsum.photos/800/800?random=3', uploadedAt: new Date('2024-01-12') },
-  { id: 5, type: 'video', url: 'https://www.w3schools.com/html/movie.mp4', uploadedAt: new Date('2024-01-11') },
-  { id: 6, type: 'image', url: 'https://picsum.photos/800/600?random=4', uploadedAt: new Date('2024-01-10') },
-];
-
-const listeners = new Set<() => void>();
-
-const galleryStore = {
-  getMedia: () => [...galleryMedia].sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()),
-  
-  addMedia: (newMedia: GalleryItem) => {
-    galleryMedia = [newMedia, ...galleryMedia];
-    listeners.forEach(listener => listener());
-  },
-  
-  deleteMedia: (id: number) => {
-    galleryMedia = galleryMedia.filter(item => item.id !== id);
-    listeners.forEach(listener => listener());
-  },
-  
-  subscribe: (listener: () => void) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  }
-};
-
 export default function GalleryGrid() {
+  const { businessSlug } = useParams<{ businessSlug: string }>();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
-  const [media, setMedia] = useState<GalleryItem[]>(galleryStore.getMedia());
+  const [media, setMedia] = useState<GalleryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const unsubscribe = galleryStore.subscribe(() => {
-      setMedia(galleryStore.getMedia());
-    });
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+    fetchGallery();
+  }, [businessSlug]);
+
+  const fetchGallery = async () => {
+    try {
+      setLoading(true);
+      const response = await galleryAPI.getByBusinessSlug(businessSlug || '');
+      setMedia(response.data.gallery);
+    } catch (error) {
+      console.error('Error fetching gallery:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation(); 
@@ -65,22 +45,26 @@ export default function GalleryGrid() {
     setSelectedIndex((prev) => (prev !== null ? (prev - 1 + media.length) % media.length : media.length - 1));
   };
 
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days} days ago`;
-    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-    return date.toLocaleDateString();
-  };
-
   const selectedMedia = selectedIndex !== null ? media[selectedIndex] : null;
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-10">
+        <p className="text-gray-500">Loading gallery...</p>
+      </div>
+    );
+  }
+
+  if (media.length === 0) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-gray-500">No photos or videos yet</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative p-4">
+    <div className="relative">
       {/* Grid View */}
       <div className="columns-2 sm:columns-3 md:columns-4 gap-2 space-y-2">
         {media.map((item, i) => (
@@ -89,9 +73,9 @@ export default function GalleryGrid() {
             onClick={() => setSelectedIndex(i)}
             className="bg-gray-200 rounded-xl overflow-hidden break-inside-avoid cursor-pointer hover:opacity-90 transition-all group relative"
           >
-            {item.type === 'video' ? (
+            {item.mediaType === 'video' ? (
               <video 
-                src={item.url} 
+                src={`http://localhost:5000${item.mediaUrl}`}
                 className="w-full h-auto object-cover" 
                 muted 
                 autoPlay 
@@ -100,21 +84,16 @@ export default function GalleryGrid() {
               />
             ) : (
               <img 
-                src={item.url} 
-                alt="Gallery post" 
+                src={`http://localhost:5000${item.mediaUrl}`}
+                alt={item.caption || "Gallery post"} 
                 className="w-full h-auto object-cover" 
               />
             )}
-            
-            {/* Upload date overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-              <p className="text-white text-xs">{formatDate(item.uploadedAt)}</p>
-            </div>
 
             {/* Video indicator */}
-            {item.type === 'video' && (
+            {item.mediaType === 'video' && (
               <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded">
-                {MdVideocam ({size:20})} 
+                {MdVideocam({size: 20})} 
               </div>
             )}
           </div>
@@ -131,51 +110,45 @@ export default function GalleryGrid() {
             className="absolute top-4 right-4 text-white text-3xl z-50 hover:scale-110 transition-transform"
             onClick={() => setSelectedIndex(null)}
           >
-            {IoClose ({})}
+            {IoClose({})}
           </button>
 
           <button 
             onClick={handlePrev}
             className="absolute left-2 md:left-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
           >
-            {IoChevronBack ({})}
+            {IoChevronBack({})}
           </button>
 
           <div 
             className="relative w-full max-w-lg md:max-w-2xl lg:max-w-3xl flex flex-col items-center"
             onClick={(e) => e.stopPropagation()} 
           >
-            {selectedMedia.type === 'video' ? (
+            {selectedMedia.mediaType === 'video' ? (
               <video 
                 ref={videoRef}
-                key={selectedMedia.url} 
-                src={selectedMedia.url} 
+                key={selectedMedia.mediaUrl} 
+                src={`http://localhost:5000${selectedMedia.mediaUrl}`}
                 controls 
                 autoPlay 
-                muted={isMuted} 
                 loop
                 playsInline
                 className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black"
               />
             ) : (
               <img 
-                src={selectedMedia.url} 
+                src={`http://localhost:5000${selectedMedia.mediaUrl}`}
                 className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black"
                 alt="Large view"
               />
             )}
-            
-            {/* Upload date in lightbox */}
-            <div className="mt-4 text-white text-sm">
-              Uploaded: {formatDate(selectedMedia.uploadedAt)}
-            </div>
           </div>
 
           <button 
             onClick={handleNext}
             className="absolute right-2 md:right-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
           >
-            {IoChevronForward ({})}
+            {IoChevronForward({})}
           </button>
         </div>
       )}

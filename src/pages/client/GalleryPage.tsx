@@ -9,15 +9,7 @@ export default function GalleryPage() {
   console.log('GalleryPage rendering...')
   
   try {
-    return (
-      <ClientLayout
-        sidebar={<ClientSidebar />}
-        footer={<Footer />}
-      >
-        <TopTabs />
-        <GalleryGrid />
-      </ClientLayout>
-    )
+    return <GalleryGrid />
   } catch (error) {
     console.error('Error in GalleryPage:', error)
     return <div>Error: {String(error)}</div>

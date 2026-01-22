@@ -1,16 +1,17 @@
 import React from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { FaImage, FaStar } from 'react-icons/fa6'
 import { FiCalendar } from "react-icons/fi"
 
 export default function TopTabs() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { businessSlug } = useParams() // Get the business slug from URL
 
   const tabs = [
-    { name: "Gallery", icon: FaImage, path: "/gallery" },
-    { name: "Services", icon: FiCalendar, path: "/services" },
-    { name: "Reviews", icon: FaStar, path: "/reviews" }
+    { name: "Gallery", icon: FaImage, path: `/${businessSlug}/gallery` },
+    { name: "Services", icon: FiCalendar, path: `/${businessSlug}/services` },
+    { name: "Reviews", icon: FaStar, path: `/${businessSlug}/reviews` }
   ]
 
   // Determine active tab based on current path

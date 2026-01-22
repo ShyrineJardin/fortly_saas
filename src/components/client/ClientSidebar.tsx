@@ -1,15 +1,76 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { FaFacebook, FaXTwitter, FaInstagram, FaLinkedin, FaLocationDot, FaAngleUp, FaAngleDown, FaRegClock, FaChevronRight } from 'react-icons/fa6'
 import { BsFillTelephoneFill } from "react-icons/bs";
 import { MdQuestionMark, MdEmail } from "react-icons/md";
 import { HiOutlineChat } from "react-icons/hi";
-import { businessData } from '../shared/BusinessData';
+import { businessAPI } from '../../utils/api';
+import { useParams,  useNavigate } from 'react-router-dom';
 
 export default function ClientSidebar() {
+  const { businessSlug } = useParams<{ businessSlug: string }>();
+  const navigate = useNavigate();
   const [isAboutOpen, setIsAboutOpen] = useState(true);
   const [isHoursOpen, setIsHoursOpen] = useState(true);
   const [isLocationOpen, setIsLocationOpen] = useState(true);
   const [showMobileInfo, setShowMobileInfo] = useState(false);
+  const [businessData, setBusinessData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchBusinessData();
+  }, [businessSlug]);
+
+  const fetchBusinessData = async () => {
+    try {
+      setLoading(true);
+      const response = await businessAPI.getBySlug(businessSlug || '');
+      setBusinessData(response.data.business);
+    } catch (error) {
+      console.error('Error fetching business data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBookNow = () => {
+    navigate(`/${businessSlug}/services`);
+  };
+
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
+  const activeSocialMedia = businessData ? [
+    { name: 'facebook', url: businessData.facebook, Icon: FaFacebook },
+    { name: 'twitter', url: businessData.twitter, Icon: FaXTwitter },
+    { name: 'instagram', url: businessData.instagram, Icon: FaInstagram },
+    { name: 'linkedin', url: businessData.linkedin, Icon: FaLinkedin }
+  ].filter(social => social.url && social.url.trim() !== '') : [];
+
+  const activeBusinessHours = businessData?.schedules?.filter((item: any) => 
+    item.enabled && item.startTime && item.endTime
+  ) || [];
+
+  if (loading) {
+    return (
+      <div className='bg-white flex items-center justify-center p-10 border rounded-3xl border-gray-200'>
+        <p className='text-gray-500'>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!businessData) {
+    return (
+      <div className='bg-white flex items-center justify-center p-10 border rounded-3xl border-gray-200'>
+        <p className='text-gray-500'>Business not found</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -21,11 +82,17 @@ export default function ClientSidebar() {
             className='flex items-center gap-3'
           >
             {businessData.logo ? (
-              <img src={businessData.logo} alt={businessData.name} className='w-10 h-10 rounded-full object-cover' />
+              <img 
+                src={`http://localhost:5000${businessData.logo}`} 
+                alt={businessData.businessName} 
+                className='w-10 h-10 rounded-full object-cover' 
+              />
             ) : (
-              <div className='w-10 h-10 rounded-full bg-gray-300' />
+              <div className='w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold'>
+                {businessData.businessName.charAt(0).toUpperCase()}
+              </div>
             )}
-            <h3 className="font-semibold md:text-base text-sm">{businessData.name}</h3>
+            <h3 className="font-semibold md:text-base text-sm">{businessData.businessName}</h3>
             {FaChevronRight({size: 16, className: "text-gray-600"})}
           </button>
           <button 
@@ -60,44 +127,64 @@ export default function ClientSidebar() {
           <div className='bg-white px-6 py-8 text-center'>
             <div className='flex justify-center mb-4'>
               {businessData.logo ? (
-                <img src={businessData.logo} alt={businessData.name} className='w-20 h-20 rounded-full object-cover' />
+                <img 
+                  src={`http://localhost:5000${businessData.logo}`} 
+                  alt={businessData.businessName} 
+                  className='w-20 h-20 rounded-full object-cover' 
+                />
               ) : (
-                <div className='w-20 h-20 rounded-full bg-gray-300' />
+                <div className='w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-2xl font-bold'>
+                  {businessData.businessName.charAt(0).toUpperCase()}
+                </div>
               )}
             </div>
-            <h1 className='md:text-lg text-base font-semibold mb-2'>{businessData.name}</h1>
+            <h1 className='md:text-lg text-base font-semibold mb-2'>{businessData.businessName}</h1>
             
-            <div className='flex justify-center gap-4 mb-4'>
-              <a href={businessData.socialMedia.facebook} className='text-gray-700'>{FaFacebook({size: '1rem'})}</a>
-              <a href={businessData.socialMedia.twitter} className='text-gray-700'>{FaXTwitter({size: '1rem'})}</a>
-              <a href={businessData.socialMedia.instagram} className='text-gray-700'>{FaInstagram({size: '1rem'})}</a>
-              <a href={businessData.socialMedia.linkedin} className='text-gray-700'>{FaLinkedin({size: '1rem'})}</a>
-            </div>
+            {activeSocialMedia.length > 0 && (
+              <div className='flex justify-center gap-4 mb-4'>
+                {activeSocialMedia.map(({ name, url, Icon }) => (
+                  <a key={name} href={url} target="_blank" rel="noopener noreferrer" className='text-gray-700 hover:text-emerald-600 transition'>
+                    {Icon({size: '1rem'})}
+                  </a>
+                ))}
+              </div>
+            )}
 
             <div className='flex flex-col items-center gap-2 text-xs text-gray-600 mb-4'>
-              <div className='flex items-center gap-2'>
-                {BsFillTelephoneFill({size: 12})}
-                <span>{businessData.phone}</span>
-              </div>
-              <div className='flex items-center gap-2'>
-                {MdEmail({size: 12})}
-                <span>{businessData.email}</span>
-              </div>
+              {businessData.phone && (
+                <a 
+                  href={`tel:${businessData.phone}`}
+                  className='flex items-center gap-2 hover:text-emerald-600 transition'
+                >
+                  {BsFillTelephoneFill({size: 12})}
+                  <span>{businessData.phone}</span>
+                </a>
+              )}
+              {businessData.email && (
+                <a 
+                  href={`mailto:${businessData.email}`}
+                  className='flex items-center gap-2 hover:text-emerald-600 transition'
+                >
+                  {MdEmail({size: 12})}
+                  <span>{businessData.email}</span>
+                </a>
+              )}
             </div>
 
-            <div className='bg-white px-6 pb-4'>
-            <p className='text-sm text-center'>
-              {businessData.tagline}
-            </p>
-            </div>
+            {businessData.tagline && (
+              <div className='bg-white px-6 pb-4'>
+                <p className='text-sm text-center'>
+                  {businessData.tagline}
+                </p>
+              </div>
+            )}
 
-            <button className='btn-primary max-w-xs'>
-              <a href="/services">Book Now</a>
+            <button className='btn-primary max-w-xs' onClick={handleBookNow}>
+              Book Now
             </button>
           </div>
 
-          
-
+          {/* About Section */}
           <div className='bg-white mt-2'>
             <button
               onClick={() => setIsAboutOpen(!isAboutOpen)}
@@ -112,12 +199,13 @@ export default function ClientSidebar() {
             {isAboutOpen && (
               <div className='px-6 pb-4'>
                 <p className='text-sm text-gray-600 leading-relaxed'>
-                  {businessData.about}
+                  {businessData.description || 'No description available'}
                 </p>
               </div>
             )}
           </div>
 
+          {/* Business Hours Section */}
           <div className='bg-white mt-2'>
             <button
               onClick={() => setIsHoursOpen(!isHoursOpen)}
@@ -132,20 +220,26 @@ export default function ClientSidebar() {
             {isHoursOpen && (
               <div className='px-6 pb-4'>
                 <div className='space-y-2'>
-                  {businessData.businessHours.map((item, index) => (
+                  {activeBusinessHours.map((item: any, index: number) => (
                     <div key={index} className='flex justify-between text-sm'>
-                      <span className='text-gray-700'>{item.day}</span>
-                      <span className='text-gray-600'>{item.time}</span>
+                      <span className='text-gray-700'>{item.dayOfWeek.substring(0, 3)}</span>
+                      <span className='text-gray-600'>
+                        {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                      </span>
                     </div>
                   ))}
+                  {activeBusinessHours.length === 0 && (
+                    <p className='text-sm text-gray-500 italic'>No business hours set</p>
+                  )}
                 </div>
                 <p className='text-xs text-gray-500 text-center mt-4 italic'>
-                  Time zone ({businessData.timezone})
+                  Time zone ({businessData.timezone || 'Not set'})
                 </p>
               </div>
             )}
           </div>
 
+          {/* Location Section */}
           <div className='bg-white mt-2'>
             <button
               onClick={() => setIsLocationOpen(!isLocationOpen)}
@@ -160,7 +254,7 @@ export default function ClientSidebar() {
             {isLocationOpen && (
               <div className='px-6 pb-4'>
                 <p className='text-sm text-gray-600'>
-                  {businessData.location}
+                  {businessData.location || 'No location set'}
                 </p>
               </div>
             )}
@@ -169,68 +263,91 @@ export default function ClientSidebar() {
       )}
 
       {/* DESKTOP SIDEBAR */}
-      <div className='hidden lg:flex bg-white flex-col items-center justify-center border rounded-3xl p-10 border-border font-poppins w-full'>
+      <div className='hidden lg:flex bg-white flex-col items-center justify-center border rounded-3xl p-10 border-gray-200 font-poppins w-full'>
         <div className='flex items-center justify-center mb-3'>
           {businessData.logo ? (
-            <img src={businessData.logo} alt={businessData.name} className='w-24 h-24 rounded-full object-cover' />
+            <img 
+              src={`http://localhost:5000${businessData.logo}`} 
+              alt={businessData.businessName} 
+              className='w-24 h-24 rounded-full object-cover' 
+            />
           ) : (
-            <div className='w-24 h-24 rounded-full bg-gray-300' />
+            <div className='w-24 h-24 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-3xl font-bold'>
+              {businessData.businessName.charAt(0).toUpperCase()}
+            </div>
           )}
         </div>
 
-        <h3 className="text-textPrimary text-center font-semibold text-lg break-words">{businessData.name}</h3>
+        <h3 className="text-gray-900 text-center font-semibold text-lg break-words">{businessData.businessName}</h3>
 
-        <div className='flex gap-4 mt-2 mb-2'>
-          <a href={businessData.socialMedia.facebook} className='text-base'>{FaFacebook({})}</a>
-          <a href={businessData.socialMedia.twitter} className='text-base'>{FaXTwitter({})}</a>
-          <a href={businessData.socialMedia.instagram} className='text-base'>{FaInstagram({})}</a>
-          <a href={businessData.socialMedia.linkedin} className='text-base'>{FaLinkedin({})}</a>
+        {activeSocialMedia.length > 0 && (
+          <div className='flex gap-4 mt-2 mb-2'>
+            {activeSocialMedia.map(({ name, url, Icon }) => (
+              <a key={name} href={url} target="_blank" rel="noopener noreferrer" className='text-base hover:text-emerald-600 transition'>
+                {Icon({})}
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div className='mt-2 flex flex-col items-center justify-center text-gray-600'>
+          {businessData.phone && (
+            <a 
+              href={`tel:${businessData.phone}`}
+              className='flex flex-row mb-1 gap-2 items-center hover:text-emerald-600 transition cursor-pointer'
+            >
+              {BsFillTelephoneFill({className: 'text-sm'})}
+              <p className='text-xs'>{businessData.phone}</p>
+            </a>
+          )}
+          {businessData.email && (
+            <a 
+              href={`mailto:${businessData.email}`}
+              className='flex flex-row mb-1 gap-2 items-center hover:text-emerald-600 transition cursor-pointer'
+            >
+              {MdEmail({className: 'text-sm'})}
+              <p className='text-xs'>{businessData.email}</p>
+            </a>
+          )}
         </div>
 
-        <div className='mt-2 flex flex-col items-center justify-center text-textSecondary'>
-          <div className='flex flex-row mb-1 gap-2 items-center text-gray-700'>
-            {BsFillTelephoneFill({className: 'text-sm'})}
-            <p className='text-xs'>{businessData.phone}</p>
-          </div>
-          <div className='flex flex-row mb-1 gap-2 items-center text-gray-700'>
-            {MdEmail({className: 'text-sm'})}
-            <p className='text-xs'>{businessData.email}</p>
-          </div>
-        </div>
+        {businessData.tagline && (
+          <p className='text-sm text-center mt-4 break-words w-full'>
+            {businessData.tagline}
+          </p>
+        )}
 
-        <p className='text-sm text-center mt-4 break-words w-full'>
-          {businessData.tagline}
-        </p>
+        <button className='btn-primary mt-4' onClick={handleBookNow}>Book Now</button>
 
-        <button className='btn-primary mt-4'><a href="/services">Book Now</a></button>
-
+        {/* About Section */}
         <div className='mt-8 w-full pt-4'>
           <button 
             onClick={() => setIsAboutOpen(!isAboutOpen)}
             className='flex items-center justify-between w-full cursor-pointer hover:opacity-70 transition-all'
           >
             <div className='flex items-center gap-2'>
-              {MdQuestionMark({className: "text-textPrimary"})}
-              <h4 className='text-textPrimary font-semibold text-base'>About</h4>
+              {MdQuestionMark({className: "text-gray-900"})}
+              <h4 className='text-gray-900 font-semibold text-base'>About</h4>
             </div>
             {isAboutOpen ? FaAngleUp({}) : FaAngleDown({})}
           </button>
           
           {isAboutOpen && (
-            <p className='text-textSecondary text-sm mt-3 leading-relaxed'>
-              {businessData.about}
+            <p className='text-gray-600 text-sm mt-3 leading-relaxed'>
+              {businessData.description || 'No description available'}
             </p>
           )}
         </div>
 
+        {/* Business Hours Section */}
         <div className="mt-8 w-full pt-4">
           <button 
             onClick={() => setIsHoursOpen(!isHoursOpen)}
             className='flex items-center justify-between w-full cursor-pointer hover:opacity-70 transition-all'
           >
             <div className='flex items-center gap-2'>
-              {FaRegClock({className: "text-textPrimary"})}
-              <h4 className='text-textPrimary font-semibold text-base'>Business Hours</h4>
+              {FaRegClock({className: "text-gray-900"})}
+              <h4 className='text-gray-900 font-semibold text-base'>Business Hours</h4>
             </div>
             {isHoursOpen ? FaAngleUp({}) : FaAngleDown({})}
           </button>
@@ -238,35 +355,41 @@ export default function ClientSidebar() {
           {isHoursOpen && (
             <div className='mt-4'>
               <div className='space-y-2'>
-                {businessData.businessHours.map((item, index) => (
+                {activeBusinessHours.map((item: any, index: number) => (
                   <div key={index} className='flex justify-between text-sm'>
-                    <span className='text-textSecondary font-medium'>{item.day}</span>
-                    <span className='text-textSecondary'>{item.time}</span>
+                    <span className='text-gray-700 font-medium'>{item.dayOfWeek.substring(0, 3)}</span>
+                    <span className='text-gray-600'>
+                      {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                    </span>
                   </div>
                 ))}
+                {activeBusinessHours.length === 0 && (
+                  <p className='text-sm text-gray-500 italic'>No business hours set</p>
+                )}
               </div>
-              <p className='text-xs text-textSecondary text-center mt-6 italic opacity-70'>
-                Time zone ({businessData.timezone})
+              <p className='text-xs text-gray-600 text-center mt-6 italic opacity-70'>
+                Time zone ({businessData.timezone || 'Not set'})
               </p>
             </div>
           )}
         </div>
 
+        {/* Location Section */}
         <div className='mt-8 w-full pt-4'>
           <button 
             onClick={() => setIsLocationOpen(!isLocationOpen)}
             className='flex items-center justify-between w-full cursor-pointer hover:opacity-70 transition-all'
           >
             <div className='flex items-center gap-2'>
-              {FaLocationDot({className: "text-textPrimary"})}
-              <h4 className='text-textPrimary font-semibold text-base'>Location</h4>
+              {FaLocationDot({className: "text-gray-900"})}
+              <h4 className='text-gray-900 font-semibold text-base'>Location</h4>
             </div>
             {isLocationOpen ? FaAngleUp({}) : FaAngleDown({})}
           </button>
           
           {isLocationOpen && (
-            <p className='text-textSecondary text-sm mt-3'>
-              {businessData.location}
+            <p className='text-gray-600 text-sm mt-3'>
+              {businessData.location || 'No location set'}
             </p>
           )}
         </div>

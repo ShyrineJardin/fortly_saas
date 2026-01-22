@@ -1,90 +1,79 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { IoClose, IoChevronBack, IoChevronForward, IoTrash, IoAdd } from 'react-icons/io5'
-import { MdVideocam, MdImage } from 'react-icons/md'
+import { MdVideocam } from 'react-icons/md'
+import { galleryAPI } from '../../utils/api'
 
 interface GalleryItem {
-  id: number;
-  type: 'image' | 'video';
-  url: string;
-  uploadedAt: Date;
+  id: string;
+  mediaType: 'image' | 'video';
+  mediaUrl: string;
+  caption?: string;
+  order: number;
 }
-
-// Simple inline store for demo purposes
-let galleryMedia: GalleryItem[] = [
-  { id: 1, type: 'image', url: 'https://picsum.photos/800/600?random=1', uploadedAt: new Date('2024-01-15') },
-  { id: 2, type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4', uploadedAt: new Date('2024-01-14') },
-  { id: 3, type: 'image', url: 'https://picsum.photos/600/800?random=2', uploadedAt: new Date('2024-01-13') },
-  { id: 4, type: 'image', url: 'https://picsum.photos/800/800?random=3', uploadedAt: new Date('2024-01-12') },
-  { id: 5, type: 'video', url: 'https://www.w3schools.com/html/movie.mp4', uploadedAt: new Date('2024-01-11') },
-  { id: 6, type: 'image', url: 'https://picsum.photos/800/600?random=4', uploadedAt: new Date('2024-01-10') },
-];
-
-const listeners = new Set<() => void>();
-
-const galleryStore = {
-  getMedia: () => [...galleryMedia].sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()),
-  
-  addMedia: (newMedia: GalleryItem) => {
-    galleryMedia = [newMedia, ...galleryMedia];
-    listeners.forEach(listener => listener());
-  },
-  
-  deleteMedia: (id: number) => {
-    galleryMedia = galleryMedia.filter(item => item.id !== id);
-    listeners.forEach(listener => listener());
-  },
-  
-  subscribe: (listener: () => void) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  }
-};
 
 export default function BusinessGallery() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
-  const [media, setMedia] = useState<GalleryItem[]>(galleryStore.getMedia());
+  const [media, setMedia] = useState<GalleryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const unsubscribe = galleryStore.subscribe(() => {
-      setMedia(galleryStore.getMedia());
-    });
-    return () => {
-      unsubscribe();
-    };
+    fetchGallery();
   }, []);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    
-    files.forEach(file => {
-      const reader = new FileReader();
-      const isVideo = file.type.startsWith('video/');
-      
-      reader.onloadend = () => {
-        const newMedia: GalleryItem = {
-          id: Date.now() + Math.random(),
-          type: isVideo ? 'video' : 'image',
-          url: reader.result as string,
-          uploadedAt: new Date()
-        };
-        galleryStore.addMedia(newMedia);
-      };
-      
-      reader.readAsDataURL(file);
-    });
-    
-    e.target.value = '';
+  const fetchGallery = async () => {
+    try {
+      setLoading(true);
+      const response = await galleryAPI.getMyGallery();
+      setMedia(response.data.gallery);
+    } catch (error) {
+      console.error('Error fetching gallery:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id: number, e: React.MouseEvent) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    
+    if (files.length === 0) return;
+
+    setUploading(true);
+
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('media', file);
+        formData.append('order', '0');
+
+        await galleryAPI.upload(formData);
+      }
+
+      // Refresh gallery after upload
+      await fetchGallery();
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert('Failed to upload some files. Please try again.');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this post?')) {
-      galleryStore.deleteMedia(id);
-      if (selectedIndex !== null) {
-        setSelectedIndex(null);
+      try {
+        await galleryAPI.delete(id);
+        await fetchGallery();
+        if (selectedIndex !== null) {
+          setSelectedIndex(null);
+        }
+      } catch (error) {
+        console.error('Error deleting gallery item:', error);
+        alert('Failed to delete. Please try again.');
       }
     }
   };
@@ -99,22 +88,18 @@ export default function BusinessGallery() {
     setSelectedIndex((prev) => (prev !== null ? (prev - 1 + media.length) % media.length : media.length - 1));
   };
 
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days} days ago`;
-    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-    return date.toLocaleDateString();
-  };
-
   const selectedMedia = selectedIndex !== null ? media[selectedIndex] : null;
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-10">
+        <p className="text-gray-500">Loading gallery...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative p-4">
+    <div className="relative">
       {/* Upload Button */}
       <div className="mb-4 flex justify-end">
         <input
@@ -124,15 +109,24 @@ export default function BusinessGallery() {
           multiple
           onChange={handleFileUpload}
           className="hidden"
+          disabled={uploading}
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="btn-secondary flex items-center"
+          disabled={uploading}
+          className="btn-secondary flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {IoAdd ({size:20})}
-          <span>Upload</span>
+          {IoAdd({size: 20})}
+          <span>{uploading ? 'Uploading...' : 'Upload'}</span>
         </button>
       </div>
+
+      {/* Empty State */}
+      {media.length === 0 && !loading && (
+        <div className="text-center py-20">
+          <p className="text-gray-500 mb-4">No media uploaded yet</p>
+        </div>
+      )}
 
       {/* Grid View */}
       <div className="columns-2 sm:columns-3 md:columns-4 gap-2 space-y-2">
@@ -142,9 +136,9 @@ export default function BusinessGallery() {
             onClick={() => setSelectedIndex(i)}
             className="bg-gray-200 rounded-xl overflow-hidden break-inside-avoid cursor-pointer hover:opacity-90 transition-all group relative"
           >
-            {item.type === 'video' ? (
+            {item.mediaType === 'video' ? (
               <video 
-                src={item.url} 
+                src={`http://localhost:5000${item.mediaUrl}`}
                 className="w-full h-auto object-cover" 
                 muted 
                 autoPlay 
@@ -153,29 +147,24 @@ export default function BusinessGallery() {
               />
             ) : (
               <img 
-                src={item.url} 
-                alt="Gallery post" 
+                src={`http://localhost:5000${item.mediaUrl}`}
+                alt={item.caption || "Gallery post"} 
                 className="w-full h-auto object-cover" 
               />
             )}
-            
-            {/* Upload date overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-              <p className="text-white text-xs">{formatDate(item.uploadedAt)}</p>
-            </div>
 
             {/* Delete button */}
             <button
               onClick={(e) => handleDelete(item.id, e)}
               className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
             >
-              {IoTrash ({size:16})}
+              {IoTrash({size: 16})}
             </button>
 
             {/* Video indicator */}
-            {item.type === 'video' && (
+            {item.mediaType === 'video' && (
               <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded">
-                {MdVideocam ({size:20})} 
+                {MdVideocam({size: 20})} 
               </div>
             )}
           </div>
@@ -192,51 +181,45 @@ export default function BusinessGallery() {
             className="absolute top-4 right-4 text-white text-3xl z-50 hover:scale-110 transition-transform"
             onClick={() => setSelectedIndex(null)}
           >
-            {IoClose ({})}
+            {IoClose({})}
           </button>
 
           <button 
             onClick={handlePrev}
             className="absolute left-2 md:left-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
           >
-            {IoChevronBack ({})}
+            {IoChevronBack({})}
           </button>
 
           <div 
             className="relative w-full max-w-lg md:max-w-2xl lg:max-w-3xl flex flex-col items-center"
             onClick={(e) => e.stopPropagation()} 
           >
-            {selectedMedia.type === 'video' ? (
+            {selectedMedia.mediaType === 'video' ? (
               <video 
                 ref={videoRef}
-                key={selectedMedia.url} 
-                src={selectedMedia.url} 
+                key={selectedMedia.mediaUrl} 
+                src={`http://localhost:5000${selectedMedia.mediaUrl}`}
                 controls 
                 autoPlay 
-                muted={isMuted} 
                 loop
                 playsInline
                 className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black"
               />
             ) : (
               <img 
-                src={selectedMedia.url} 
+                src={`http://localhost:5000${selectedMedia.mediaUrl}`}
                 className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black"
                 alt="Large view"
               />
             )}
-            
-            {/* Upload date in lightbox */}
-            <div className="mt-4 text-white text-sm">
-              Uploaded: {formatDate(selectedMedia.uploadedAt)}
-            </div>
 
             {/* Delete button in lightbox */}
             <button
               onClick={(e) => handleDelete(selectedMedia.id, e)}
-              className="mt-2 flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+              className="mt-4 flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
             >
-              {IoTrash ({size:16})}
+              {IoTrash({size: 16})}
               <span>Delete</span>
             </button>
           </div>
@@ -245,7 +228,7 @@ export default function BusinessGallery() {
             onClick={handleNext}
             className="absolute right-2 md:right-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
           >
-            {IoChevronForward ({})}
+            {IoChevronForward({})}
           </button>
         </div>
       )}

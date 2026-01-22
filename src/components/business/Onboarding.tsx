@@ -1,38 +1,76 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FaAngleUp, FaAngleDown } from 'react-icons/fa6'
+import { authAPI, businessAPI } from '../../utils/api'
 
 export default function Onboarding() {
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  
   const [formData, setFormData] = useState({
-    businessName: '',
-    fullName: '',
-    businessType: '',
-    timezone: '',
+    ownerName: '',
+    category: '',
     phone: '',
     location: '',
     tagline: '',
-    about: ''
+    description: '',
+    logo: null as File | null,
   })
 
-  const [isBusinessTypeOpen, setIsBusinessTypeOpen] = useState(false)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false)
   const [isTimezoneOpen, setIsTimezoneOpen] = useState(false)
 
-  const businessTypes = [
+  const businessCategories = [
     'Salon / Spa',
     'Restaurant',
     'Retail Store',
     'Fitness Center',
     'Consulting',
     'Photography',
+    'Healthcare',
+    'Education',
+    'Event Planning',
+    'Home Services',
     'Other'
   ]
 
-  const timezone = [
-    'UTC +10:30',
-    'UTC +09:00',
-    'UTC +08:00',
-    'UTC +07:00',
-    'UTC +06:00'
-  ]
+
+  // Fetch current user data on mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await authAPI.getMe()
+        const business = response.data.business
+        
+        // Set business name (read-only)
+        setBusinessName(business.businessName)
+        
+        // Pre-fill form if data exists
+        setFormData(prev => ({
+          ...prev,
+          ownerName: business.ownerName || '',
+          category: business.category || '',
+          phone: business.phone || '',
+          location: business.location || '',
+          tagline: business.tagline || '',
+          description: business.description || '',
+        }))
+        
+        // Set logo preview if exists
+        if (business.logo) {
+          setLogoPreview(`http://localhost:5000${business.logo}`)
+        }
+      } catch (err) {
+        console.error('Error fetching user data:', err)
+        setError('Failed to load business data')
+      }
+    }
+
+    fetchUserData()
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -41,19 +79,77 @@ export default function Onboarding() {
     })
   }
 
-  const handleSelectBusinessType = (type: string) => {
-    setFormData({ ...formData, businessType: type })
-    setIsBusinessTypeOpen(false)
+  const handleSelectCategory = (category: string) => {
+    setFormData({ ...formData, category })
+    setIsCategoryOpen(false)
   }
 
-  const handleSelectTimezone = (timezone: string) => {
-    setFormData({ ...formData, timezone: timezone })
-    setIsTimezoneOpen(false)
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Logo file size must be less than 5MB')
+        return
+      }
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please upload an image file')
+        return
+      }
+
+      setFormData({ ...formData, logo: file })
+      setLogoPreview(URL.createObjectURL(file))
+      setError('')
+    }
   }
 
-  const handleSubmit = () => {
-    console.log('Onboarding submitted:', formData)
-    // Add your onboarding logic here
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+
+    // Validation
+    if (!formData.ownerName.trim()) {
+      setError('Owner name is required')
+      return
+    }
+
+    if (!formData.category) {
+      setError('Please select a business category')
+      return
+    }
+
+
+    setLoading(true)
+
+    try {
+      // Create FormData for file upload
+      const data = new FormData()
+      data.append('ownerName', formData.ownerName)
+      data.append('category', formData.category)
+      data.append('phone', formData.phone)
+      data.append('location', formData.location)
+      data.append('tagline', formData.tagline)
+      data.append('description', formData.description)
+      
+      if (formData.logo) {
+        data.append('logo', formData.logo)
+      }
+
+      const response = await businessAPI.completeOnboarding(data)
+      
+      console.log('Onboarding completed:', response.data)
+      
+      // Navigate to gallery or next step
+      navigate('/business/gallery')
+    } catch (err: any) {
+      console.error('Onboarding error:', err)
+      setError(err.response?.data?.message || 'Failed to complete onboarding. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -69,76 +165,112 @@ export default function Onboarding() {
           </p>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Form */}
-        <div className="space-y-6">
-          {/* Row 1: Business Owner & Business Name */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* Logo Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Business Logo
+            </label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-emerald-500 transition-colors">
+              <input
+                type="file"
+                id="logo"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="hidden"
+                disabled={loading}
+              />
+              <label htmlFor="logo" className="cursor-pointer">
+                {logoPreview ? (
+                  <div className="space-y-2">
+                    <img src={logoPreview} alt="Logo preview" className="w-32 h-32 object-cover mx-auto rounded-lg" />
+                    <p className="text-sm text-emerald-600">Click to change</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-4xl text-gray-400">📷</div>
+                    <p className="text-sm text-gray-500">Click to upload logo</p>
+                    <p className="text-xs text-gray-400">PNG, JPG up to 5MB</p>
+                  </div>
+                )}
+              </label>
+            </div>
+          </div>
+
+          {/* Row 1: Business Name (Read-only) & Owner's Full Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Business Name Input */}
+            {/* Business Name - READ ONLY */}
             <div>
               <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2">
-                Business Name <span className="text-red-500">*</span>
+                Business Name
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="businessName"
-                  name="businessName"
-                  value={formData.businessName}
-                  onChange={handleChange}
-                  placeholder="Enter business name"
-                className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                />
-              </div>
+              <input
+                type="text"
+                id="businessName"
+                value={businessName}
+                readOnly
+                className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+              />
             </div>
 
             {/* Full Name Input */}
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name <span className="text-red-500">*</span>
+              <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-2">
+                Owner's Full Name <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="fullName"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  placeholder="Enter your full name"
+              <input
+                type="text"
+                id="ownerName"
+                name="ownerName"
+                value={formData.ownerName}
+                onChange={handleChange}
+                placeholder="Enter owner's full name"
                 className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                />
-              </div>
+                disabled={loading}
+                required
+              />
             </div>
           </div>
 
-          {/* Row 2: Business Type & Timezone */}
+          {/* Row 2: Business Category & Timezone */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Business Type Dropdown */}
+            {/* Business Category Dropdown */}
             <div>
-              <label htmlFor="businessType" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
                 What type of business are you? <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setIsBusinessTypeOpen(!isBusinessTypeOpen)}
+                  onClick={() => setIsCategoryOpen(!isCategoryOpen)}
                   className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-left flex items-center justify-between"
+                  disabled={loading}
                 >
-                  <span className={formData.businessType ? 'text-gray-800' : 'text-gray-400'}>
-                    {formData.businessType || 'Salon / Spa'}
+                  <span className={formData.category ? 'text-gray-800' : 'text-gray-400'}>
+                    {formData.category || 'Select category'}
                   </span>
-                  {FaAngleUp({ size: '1.25rem', className: `w-5 h-5 text-gray-400 transition-transform ${isBusinessTypeOpen ? 'rotate-180' : ''}` })}
+                  {isCategoryOpen ? FaAngleUp ({className:"text-gray-400" }) : FaAngleDown ({className:"text-gray-400"})}
                 </button>
                 
-                {isBusinessTypeOpen && (
+                {isCategoryOpen && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {businessTypes.map((type) => (
+                    {businessCategories.map((category) => (
                       <button
-                        key={type}
+                        key={category}
                         type="button"
-                        onClick={() => handleSelectBusinessType(type)}
-                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 transition-colors"
+                        onClick={() => handleSelectCategory(category)}
+                        className="w-full px-4 py-2 text-left text-sm hover:bg-emerald-50 transition-colors"
                       >
-                        {type}
+                        {category}
                       </button>
                     ))}
                   </div>
@@ -146,39 +278,6 @@ export default function Onboarding() {
               </div>
             </div>
 
-            {/* Timezone Dropdown */}
-            <div>
-              <label htmlFor="timezone" className="block text-sm font-medium text-gray-700 mb-2">
-                Timezone <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsTimezoneOpen(!isTimezoneOpen)}
-                  className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-left flex items-center justify-between"
-                >
-                  <span className={formData.timezone ? 'text-gray-800' : 'text-gray-400'}>
-                    {formData.timezone || 'UTC +1'}
-                  </span>
-                  {isTimezoneOpen ? FaAngleUp({ size: '1.25rem', className: 'text-gray-400' }) : FaAngleDown({ size: '1.25rem', className: 'text-gray-400' })}
-                </button>
-
-                {isTimezoneOpen && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {timezone.map((timezone) => (
-                      <button
-                        key={timezone}
-                        type="button"
-                        onClick={() => handleSelectTimezone(timezone)}
-                        className="w-full px-4 py-2 text-left hover:bg-emerald-50 transition-colors"
-                      >
-                        {timezone}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Optional Details Divider */}
@@ -201,6 +300,7 @@ export default function Onboarding() {
                 onChange={handleChange}
                 placeholder="Enter phone number"
                 className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={loading}
               />
             </div>
 
@@ -217,6 +317,7 @@ export default function Onboarding() {
                 onChange={handleChange}
                 placeholder="Enter location"
                 className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={loading}
               />
             </div>
           </div>
@@ -233,25 +334,27 @@ export default function Onboarding() {
                 name="tagline"
                 value={formData.tagline}
                 onChange={handleChange}
-                placeholder="Message"
+                placeholder="A catchy phrase about your business"
                 rows={4}
                 className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={loading}
               />
             </div>
 
             {/* Short Description */}
             <div>
-              <label htmlFor="about" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
                 Short description
               </label>
               <textarea
-                id="about"
-                name="about"
-                value={formData.about}
+                id="description"
+                name="description"
+                value={formData.description}
                 onChange={handleChange}
-                placeholder="Message"
+                placeholder="Tell us about your business"
                 rows={4}
                 className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={loading}
               />
             </div>
           </div>
@@ -259,13 +362,14 @@ export default function Onboarding() {
           {/* Continue Button */}
           <div className="pt-4">
             <button
-              onClick={handleSubmit}
-              className="btn-primary w-full"
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Continue
+              {loading ? 'Saving...' : 'Continue'}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )

@@ -1,60 +1,147 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaAngleUp, FaAngleDown } from "react-icons/fa6";
 import { CiCircleChevRight } from "react-icons/ci";
 import BookingPolicy from "../shared/BookingPolicy";
 import ServiceCard from "../shared/ServiceCard";
+import { useParams } from "react-router-dom";
+
+interface Service {
+  id: string;
+  name: string;
+  duration: string;
+  price: string;
+  description: string;
+  image?: string;
+}
+
+interface BookingPolicyData {
+  title: string;
+  description: string;
+  policyList: string[];
+}
+
+interface Business {
+  id: string;
+  name: string;
+  slug: string;
+  bookingPolicyTitle?: string;
+  bookingPolicyDescription?: string;
+  bookingPolicyList?: string[];
+  services?: Service[];
+}
 
 export default function Service() {
-  const [isOpen, setIsOpen] = useState(false);
+  const { businessSlug } = useParams<{ businessSlug: string }>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [business, setBusiness] = useState<Business | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [bookingPolicy, setBookingPolicy] = useState<BookingPolicyData>({
+    title: "Booking Policy",
+    description: "",
+    policyList: []
+  });
 
-  const services = [
-    {
-      id: 1,
-      title: "Full Body Massage",
-      duration: "60 mins",
-      price: "PHP 1,500.00",
-      description: "A relaxing full body massage using organic essential oils to relieve stress and muscle tension."
-    },
-    {
-      id: 2,
-      title: "Facial Treatment",
-      duration: "45 mins",
-      price: "PHP 1,200.00",
-      description: "Deep cleansing facial treatment suitable for all skin types. Includes mask and extraction."
+  useEffect(() => {
+    loadBusinessData();
+  }, [businessSlug]);
+
+  const loadBusinessData = async () => {
+    try {
+      setLoading(true);
+      setError(''); // Clear previous errors
+      
+      console.log('Loading business with slug:', businessSlug);
+      
+      // Fetch business data by slug (public route)
+      const response = await fetch(`http://localhost:5000/api/business/${businessSlug}`);
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.message || 'Failed to load business data');
+      }
+
+      const data = await response.json();
+      console.log('Loaded business data:', data);
+      
+      const businessData = data.business;
+      
+      if (!businessData) {
+        throw new Error('Business not found');
+      }
+      
+      setBusiness(businessData);
+      
+      // Set booking policy
+      setBookingPolicy({
+        title: businessData.bookingPolicyTitle || "Booking Policy",
+        description: businessData.bookingPolicyDescription || "",
+        policyList: businessData.bookingPolicyList || []
+      });
+
+      // Set services
+      setServices(businessData.services || []);
+      
+    } catch (err: any) {
+      console.error('Error loading business data:', err);
+      setError(err.message || 'Failed to load business information');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center p-8">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
       {/* Booking Policy Section */}
       <BookingPolicy 
-         title="Booking Policy"
-         description="Our booking policy ensures that all appointments are scheduled fairly."
-         policyList={[
-           "All bookings must be made 24h in advance.",
-           "Cancellations must be made 12h prior."
-         ]}
+        title={bookingPolicy.title}
+        description={bookingPolicy.description}
+        policyList={bookingPolicy.policyList}
       />
 
       {/* Services Section */}
       <div>
         <h2 className="lg:text-lg text-base font-semibold mb-4">Services</h2>
         
-        {/* Dynamic Service Cards */}
-        <div className="mb-6">
-          {services.map((service) => (
-            <ServiceCard 
-              key={service.id}      
-              id={service.id}       
-              title={service.title}
-              duration={service.duration}
-              price={service.price}
-              description={service.description}
-              showArrow={true}
-            />
-          ))}
-        </div> 
-
+        {services.length === 0 ? (
+          <p className="text-center text-gray-500 py-8">No services available at the moment.</p>
+        ) : (
+          <div className="mb-6">
+            {services.map((service) => (
+              <ServiceCard 
+                key={service.id}      
+                id={service.id}       
+                title={service.name}
+                duration={service.duration}
+                price={service.price}
+                description={service.description}
+                image={service.image ? `http://localhost:5000${service.image}` : undefined}
+                showArrow={true}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
