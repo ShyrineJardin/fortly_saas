@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { IoChatbubbleEllipsesOutline, IoClose, IoSend, IoImageOutline } from "react-icons/io5";
 import { FaAngleDown, FaChevronLeft } from 'react-icons/fa6';
 import axios from 'axios';
+import { io, Socket } from 'socket.io-client';
 
 interface ChatWidgetProps {
   businessSlug: string;
@@ -187,6 +188,8 @@ export default function ChatWidget({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const [notificationSound] = useState(new Audio('/notification.mp3'));
 
   // Scroll to bottom function
   const scrollToBottom = () => {
@@ -227,6 +230,50 @@ export default function ChatWidget({
     window.addEventListener('openChat', handleOpenChat);
     return () => window.removeEventListener('openChat', handleOpenChat);
   }, []);
+
+  // Initialize Socket.IO
+  useEffect(() => {
+    if (userEmail && businessSlug) {
+      // ✅ Use dynamic URL instead of hardcoded localhost
+      const socketUrl = apiBaseUrl.replace('/api', '');
+      socketRef.current = io(socketUrl);
+    
+      // Join client room
+      socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
+    
+      // Listen for new messages
+      socketRef.current.on('new-message', (data) => {
+        console.log('🔔 New message received:', data);
+        
+        // Play notification sound
+        notificationSound.play().catch(err => console.log('Audio play failed:', err));
+        
+        // Reload messages
+        loadMessages(userEmail, true);
+        
+        // Show browser notification if chat is not focused
+        if (document.hidden && Notification.permission === 'granted') {
+          new Notification(`New message from ${data.businessName}`, {
+            body: data.message.message || 'New file received',
+            icon: '/logo192.png',
+            badge: '/logo192.png'
+          });
+        }
+      });
+    
+      // Request notification permission
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off('new-message');
+        socketRef.current.disconnect();
+      }
+    };
+  }, [userEmail, businessSlug, apiBaseUrl]);
 
   const fetchBusinessDetails = async () => {
     try {

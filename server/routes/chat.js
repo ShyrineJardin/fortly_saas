@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
+const emailService = require('../services/emailService');
 
 router.get('/public/:businessSlug', async (req, res) => {
   try {
@@ -184,6 +185,38 @@ router.post('/send-business', async (req, res) => {
       sender: 'business'
     });
 
+    // Get Socket.IO instance
+    const io = req.app.get('io');
+
+    // Send real-time notification via Socket.IO
+    if (io) {
+      io.to(`client-${businessSlug}-${clientEmail}`).emit('new-message', {
+        message: newMessage,
+        sender: 'business',
+        businessName: business.businessName
+      });
+      console.log('🔔 Real-time notification sent to client');
+    }
+
+    // ✅ Send email notification with error handling
+    try {
+      const messageText = messageType === 'text' ? message : `Sent a ${messageType}`;
+      const emailSent = await emailService.sendClientNotification(
+        clientEmail,
+        clientName,
+        business.businessName,
+        messageText,
+        businessSlug
+      );
+      
+      if (!emailSent) {
+        console.warn('⚠️ Email notification failed but message was sent');
+      }
+    } catch (emailError) {
+      console.error('❌ Email notification error:', emailError);
+      // Don't fail the request if email fails
+    }
+
     res.status(201).json({ 
       message: 'Message sent successfully',
       messageData: newMessage 
@@ -193,6 +226,7 @@ router.post('/send-business', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
 
 // Get messages for a conversation
 router.get('/messages/:clientEmail', authMiddleware, async (req, res) => {
@@ -296,7 +330,7 @@ router.post('/send', authMiddleware, async (req, res) => {
   }
 });
 
-// Update send-client route to handle files
+// Send message from client
 router.post('/send-client', async (req, res) => {
   try {
     const { businessSlug, clientEmail, clientName, message, messageType, fileContent } = req.body;
@@ -317,6 +351,43 @@ router.post('/send-client', async (req, res) => {
       fileName: messageType ? message : null, 
       sender: 'client'
     });
+
+    // Get Socket.IO instance
+    const io = req.app.get('io');
+
+    // Send real-time notification via Socket.IO
+    if (io) {
+      io.to(`business-${businessSlug}`).emit('new-message', {
+        message: newMessage,
+        sender: 'client',
+        clientName: clientName,
+        clientEmail: clientEmail
+      });
+      console.log('🔔 Real-time notification sent to business');
+    }
+
+    // ✅ Send email notification with error handling
+    if (business.email) {
+      try {
+        const messageText = messageType === 'text' ? message : `Sent a ${messageType}`;
+        const emailSent = await emailService.sendBusinessNotification(
+          business.email,
+          business.businessName,
+          clientName,
+          clientEmail,
+          messageText
+        );
+        
+        if (!emailSent) {
+          console.warn('⚠️ Email notification failed but message was sent');
+        }
+      } catch (emailError) {
+        console.error('❌ Email notification error:', emailError);
+        // Don't fail the request if email fails
+      }
+    } else {
+      console.warn('⚠️ Business email not configured, skipping email notification');
+    }
 
     res.status(201).json({ 
       message: 'Message sent successfully',

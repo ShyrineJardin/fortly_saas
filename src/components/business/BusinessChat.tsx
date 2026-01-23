@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { IoChatbubbleEllipsesOutline, IoClose, IoSend, IoImageOutline, IoSearch } from "react-icons/io5";
 import { FaAngleDown, FaChevronLeft } from 'react-icons/fa6';
 import axios from 'axios';
+import { io, Socket } from 'socket.io-client';
 
 interface Client {
   id: number;
@@ -48,6 +49,8 @@ export default function BusinessChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const [notificationSound] = useState(new Audio('/notification.mp3')); 
 
   const currentMessages = chatMessages[activeChat || ''] || [];
 
@@ -74,6 +77,54 @@ export default function BusinessChat({
     window.addEventListener('openChat', handleOpenChat);
     return () => window.removeEventListener('openChat', handleOpenChat);
   }, []);
+
+  // Initialize Socket.IO
+  useEffect(() => {
+    // ✅ Use dynamic URL
+    const socketUrl = apiBaseUrl.replace('/api', '');
+    socketRef.current = io(socketUrl);
+  
+    // Join business room
+    socketRef.current.emit('join-business', businessSlug);
+  
+    // Listen for new messages
+    socketRef.current.on('new-message', (data) => {
+      console.log('🔔 New message received:', data);
+      
+      // Play notification sound
+      notificationSound.play().catch(err => console.log('Audio play failed:', err));
+      
+      // Reload messages if chat is active with this client
+      if (data.clientEmail && activeChat === data.clientEmail) {
+        loadMessages(data.clientEmail, true);
+      }
+      
+      // Reload client list to update last message
+      loadClients();
+      
+      // Show browser notification
+      if (document.hidden && Notification.permission === 'granted') {
+        new Notification(`New message from ${data.clientName}`, {
+          body: data.message.message || 'New file received',
+          icon: '/logo192.png',
+          badge: '/logo192.png',
+          tag: data.clientEmail
+        });
+      }
+    });
+  
+    // Request notification permission
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off('new-message');
+        socketRef.current.disconnect();
+      }
+    };
+  }, [businessSlug, activeChat, apiBaseUrl]);
 
   const loadClients = async () => {
     setIsLoadingClients(true);
