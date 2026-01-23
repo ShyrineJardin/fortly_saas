@@ -106,18 +106,26 @@ router.get('/clients/:businessSlug', async (req, res) => {
     }
 
     // Get unique client emails with their latest message
-    const clients = await db.Message.findAll({
-      where: { businessId: business.id },
-      attributes: [
-        'clientEmail',
-        'clientName',
-        [db.sequelize.fn('MAX', db.sequelize.col('message')), 'lastMessage'],
-        [db.sequelize.fn('MAX', db.sequelize.col('createdAt')), 'lastMessageTime'],
-        [db.sequelize.fn('COUNT', db.sequelize.literal('CASE WHEN "isRead" = false AND sender = \'client\' THEN 1 END')), 'unread']
-      ],
-      group: ['clientEmail', 'clientName'],
-      order: [[db.sequelize.literal('MAX("createdAt")'), 'DESC']],
-      raw: true
+    const clients = await db.sequelize.query(`
+      SELECT DISTINCT ON (m1."clientEmail")
+        m1."clientEmail",
+        m1."clientName",
+        m1."message" as "lastMessage",
+        m1."createdAt" as "lastMessageTime",
+        (
+          SELECT COUNT(*)
+          FROM "Messages" m2
+          WHERE m2."businessId" = m1."businessId"
+            AND m2."clientEmail" = m1."clientEmail"
+            AND m2."isRead" = false
+            AND m2."sender" = 'client'
+        ) as unread
+      FROM "Messages" m1
+      WHERE m1."businessId" = :businessId
+      ORDER BY m1."clientEmail", m1."createdAt" DESC
+    `, {
+      replacements: { businessId: business.id },
+      type: db.sequelize.QueryTypes.SELECT
     });
 
     // Format the response
@@ -132,6 +140,13 @@ router.get('/clients/:businessSlug', async (req, res) => {
       }),
       unread: parseInt(client.unread) || 0
     }));
+
+    // Sort by most recent message first
+    formattedClients.sort((a, b) => {
+      const timeA = clients.find(c => c.clientEmail === a.clientEmail).lastMessageTime;
+      const timeB = clients.find(c => c.clientEmail === b.clientEmail).lastMessageTime;
+      return new Date(timeB) - new Date(timeA);
+    });
 
     res.json({ clients: formattedClients });
   } catch (error) {

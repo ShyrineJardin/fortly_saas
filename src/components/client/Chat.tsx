@@ -20,22 +20,23 @@ interface Message {
   createdAt?: string;
 }
 
-// Move WelcomeForm OUTSIDE the main component
 const WelcomeForm = ({ 
   userName, 
   setUserName, 
   userEmail, 
   setUserEmail, 
-  onSubmit 
+  onSubmit,
+  onSwitchToReturning
 }: {
   userName: string;
   setUserName: (name: string) => void;
   userEmail: string;
   setUserEmail: (email: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  onSwitchToReturning: () => void;
 }) => (
   <div className="p-6 bg-gray-50 h-full flex flex-col justify-center">
-    <div className="mb-6 text-center">
+    <div className="mb-3 text-center">
       <h3 className="text-xl font-semibold text-gray-800 mb-2">
         👋 Welcome!
       </h3>
@@ -81,8 +82,83 @@ const WelcomeForm = ({
       </button>
     </form>
     
-    <p className="text-xs text-gray-500 text-center mt-4">
-      We'll save your conversation so you can pick up where you left off.
+    <div className="mt-3 pt-2 border-t border-gray-300">
+      <p className="text-xs text-gray-600 text-center mb-2">
+        Already chatted with us before?
+      </p>
+      <button
+        type="button"
+        onClick={onSwitchToReturning}
+        className="w-full text-sm text-primaryGreen hover:text-hoverGreen font-medium transition-colors"
+      >
+        Continue with existing email →
+      </button>
+    </div>
+  </div>
+);
+
+const ReturningUserForm = ({ 
+  userEmail, 
+  setUserEmail, 
+  onSubmit,
+  onSwitchToNew,
+  error,
+  isLoading
+}: {
+  userEmail: string;
+  setUserEmail: (email: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onSwitchToNew: () => void;
+  error: string;
+  isLoading: boolean;
+}) => (
+  <div className="p-6 bg-gray-50 h-full flex flex-col justify-center">
+    
+    <div className="mb-6 text-center">
+      <h3 className="text-xl font-semibold text-gray-800 mb-2">
+        Welcome Back! 👋
+      </h3>
+      <p className="text-sm text-gray-600">
+        Enter your email to continue your conversation
+      </p>
+    </div>
+    
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Your email
+        </label>
+        <input
+          type="email"
+          value={userEmail}
+          onChange={(e) => setUserEmail(e.target.value)}
+          placeholder="your@email.com"
+          className="text-sm w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen"
+          required
+        />
+        {error && (
+          <p className="text-xs text-red-600 mt-2">{error}</p>
+        )}
+      </div>
+      
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isLoading ? 'Loading...' : 'Continue Conversation'}
+      </button>
+    </form>
+    
+    <p className="text-xs text-gray-500 text-center mt-6">
+      Don't have a conversation yet?{' '}
+      <button
+        type="button"
+        onClick={onSwitchToNew}
+        className="text-primaryGreen hover:text-hoverGreen font-medium"
+      >
+        Start a new one
+      </button>
     </p>
   </div>
 );
@@ -95,21 +171,39 @@ export default function ChatWidget({
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [showWelcomeForm, setShowWelcomeForm] = useState(false);
+  const [showReturningForm, setShowReturningForm] = useState(false);
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [returningEmail, setReturningEmail] = useState("");
+  const [returningError, setReturningError] = useState("");
+  const [isLoadingReturning, setIsLoadingReturning] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [businessName, setBusinessName] = useState("Business Name");
   const [businessLogo, setBusinessLogo] = useState("");
   const [zoomedMedia, setZoomedMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
+  const [clickedMessageId, setClickedMessageId] = useState<string | number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageContainerRef = useRef<HTMLDivElement>(null);
+  const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
 
-  // Check if user info exists and load messages
+  // Scroll to bottom function
+  const scrollToBottom = () => {
+    // Desktop scroll
+    if (messageContainerRef.current) {
+      messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+    }
+    // Mobile scroll
+    if (mobileMessageContainerRef.current) {
+      mobileMessageContainerRef.current.scrollTop = mobileMessageContainerRef.current.scrollHeight;
+    }
+  };
+
   useEffect(() => {
     const storedName = localStorage.getItem(`chat_${businessSlug}_name`);
     const storedEmail = localStorage.getItem(`chat_${businessSlug}_email`);
 
-    // Fetch business details
     fetchBusinessDetails();
 
     if (storedName && storedEmail) {
@@ -121,19 +215,19 @@ export default function ChatWidget({
     }
   }, [businessSlug]);
 
-  // Auto-scroll to bottom when messages change
+  // Scroll to bottom when chat opens
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (isOpen && messages.length > 0) {
+      setTimeout(scrollToBottom, 100);
+    }
+  }, [isOpen]);
 
-  // Listen for open chat event from mobile header
   useEffect(() => {
     const handleOpenChat = () => setIsOpen(true);
     window.addEventListener('openChat', handleOpenChat);
     return () => window.removeEventListener('openChat', handleOpenChat);
   }, []);
 
-  // Fetch business details
   const fetchBusinessDetails = async () => {
     try {
       const response = await axios.get(`${apiBaseUrl}/business/${businessSlug}`);
@@ -152,9 +246,10 @@ export default function ChatWidget({
     }
   };
 
-  // Load messages from backend
-  const loadMessages = async (email: string) => {
-    setIsLoadingMessages(true);
+  const loadMessages = async (email: string, skipLoadingState = false) => {
+    if (!skipLoadingState) {
+      setIsLoadingMessages(true);
+    }
     try {
       const response = await axios.get(
         `${apiBaseUrl}/chat/messages/client/${businessSlug}/${email}`
@@ -170,27 +265,38 @@ export default function ChatWidget({
         }),
         type: msg.messageType || null,
         content: msg.fileContent,
-        fileName: msg.fileName
+        fileName: msg.fileName,
+        createdAt: msg.createdAt
       }));
       
       setMessages(formattedMessages);
+      
+      // Instant scroll to bottom - no animation
+      requestAnimationFrame(() => {
+        if (messageContainerRef.current) {
+          messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+        }
+        if (mobileMessageContainerRef.current) {
+          mobileMessageContainerRef.current.scrollTop = mobileMessageContainerRef.current.scrollHeight;
+        }
+      });
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
-      setIsLoadingMessages(false);
+      if (!skipLoadingState) {
+        setIsLoadingMessages(false);
+      }
+      setIsInitialLoad(false);
     }
   };
 
-  // Handle welcome form submission
   const handleWelcomeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (userName.trim() && userEmail.trim()) {
-      // Save to localStorage
       localStorage.setItem(`chat_${businessSlug}_name`, userName);
       localStorage.setItem(`chat_${businessSlug}_email`, userEmail);
       
-      // Send initial greeting message
       try {
         await axios.post(`${apiBaseUrl}/chat/send-client`, {
           businessSlug,
@@ -199,7 +305,6 @@ export default function ChatWidget({
           message: `Hi! I'm ${userName}. I'd like to get in touch.`
         });
         
-        // Load messages
         await loadMessages(userEmail);
       } catch (error) {
         console.error('Error sending initial message:', error);
@@ -207,6 +312,61 @@ export default function ChatWidget({
       
       setShowWelcomeForm(false);
     }
+  };
+
+  const handleReturningSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setReturningError("");
+    setIsLoadingReturning(true);
+    
+    if (returningEmail.trim()) {
+      try {
+        // Check if this email has messages
+        const response = await axios.get(
+          `${apiBaseUrl}/chat/messages/client/${businessSlug}/${returningEmail}`
+        );
+        
+        if (response.data.messages && response.data.messages.length > 0) {
+          // Email found with messages - get client name from first message
+          const clientName = response.data.messages[0].clientName || "User";
+          
+          // Save to localStorage
+          localStorage.setItem(`chat_${businessSlug}_name`, clientName);
+          localStorage.setItem(`chat_${businessSlug}_email`, returningEmail);
+          
+          setUserName(clientName);
+          setUserEmail(returningEmail);
+          
+          // Load messages
+          await loadMessages(returningEmail);
+          
+          setShowReturningForm(false);
+          setShowWelcomeForm(false);
+        } else {
+          // No messages found
+          setReturningError("No conversation found with this email. Please start a new chat.");
+        }
+      } catch (error) {
+        console.error('Error checking email:', error);
+        setReturningError("No conversation found with this email. Please start a new chat.");
+      } finally {
+        setIsLoadingReturning(false);
+      }
+    }
+  };
+
+  const switchToReturningForm = () => {
+    setShowWelcomeForm(false);
+    setShowReturningForm(true);
+    setReturningEmail("");
+    setReturningError("");
+  };
+
+  const switchToWelcomeForm = () => {
+    setShowReturningForm(false);
+    setShowWelcomeForm(true);
+    setUserName("");
+    setUserEmail("");
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,7 +381,6 @@ export default function ChatWidget({
           const result = event.target?.result;
           if (result && typeof result === 'string') {
             try {
-              // Send to backend
               await axios.post(`${apiBaseUrl}/chat/send-client`, {
                 businessSlug,
                 clientEmail: userEmail,
@@ -231,8 +390,7 @@ export default function ChatWidget({
                 fileContent: result
               });
               
-              // Reload messages
-              await loadMessages(userEmail);
+              await loadMessages(userEmail, true);
             } catch (error) {
               console.error('Error sending file:', error);
             }
@@ -255,7 +413,7 @@ export default function ChatWidget({
         });
         
         setMessage("");
-        await loadMessages(userEmail);
+        await loadMessages(userEmail, true);
       } catch (error) {
         console.error('Error sending message:', error);
       }
@@ -267,6 +425,38 @@ export default function ChatWidget({
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const formatTimestamp = (createdAt: string) => {
+    const messageDate = new Date(createdAt);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const isToday = messageDate.toDateString() === today.toDateString();
+    const isYesterday = messageDate.toDateString() === yesterday.toDateString();
+
+    const timeStr = messageDate.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+
+    if (isToday) {
+      return timeStr;
+    } else if (isYesterday) {
+      return `Yesterday ${timeStr}`;
+    } else {
+      const dateStr = messageDate.toLocaleDateString([], { 
+        month: 'short', 
+        day: 'numeric',
+        year: messageDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      });
+      return `${dateStr} ${timeStr}`;
+    }
+  };
+
+  const handleMessageClick = (msgId: string | number) => {
+    setClickedMessageId(clickedMessageId === msgId ? null : msgId);
   };
 
   const renderMessage = (msg: Message) => {
@@ -302,7 +492,6 @@ export default function ChatWidget({
         className="hidden"
       />
 
-      {/* MEDIA ZOOM MODAL */}
       {zoomedMedia && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-90 z-[100] flex items-center justify-center p-4"
@@ -337,11 +526,9 @@ export default function ChatWidget({
 
       {/* DESKTOP CHAT WIDGET */}
       <div className="hidden lg:block fixed bottom-6 right-6 z-50">
-        {/* Chat Window */}
         {isOpen && (
           <div className="bg-white rounded-2xl shadow-2xl w-80 mb-4 overflow-hidden border border-gray-200">
-            {/* Chat Header */}
-            <div className="bg-white p-4 flex items-center justify-between border-b border-gray-200">
+            <div className="bg-white p-3 flex items-center justify-between border-b border-gray-200">
               <div className="flex items-center gap-3">
                 {businessLogo ? (
                   <img 
@@ -358,11 +545,10 @@ export default function ChatWidget({
                 onClick={() => setIsOpen(false)}
                 className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
-                {FaAngleDown({ size: 20, className: "text-gray-600" })}
+                {FaAngleDown ({size:20, className:"text-gray-600"})} 
               </button>
             </div>
 
-            {/* Chat Content */}
             {showWelcomeForm ? (
               <div className="h-96">
                 <WelcomeForm 
@@ -371,13 +557,24 @@ export default function ChatWidget({
                   userEmail={userEmail}
                   setUserEmail={setUserEmail}
                   onSubmit={handleWelcomeSubmit}
+                  onSwitchToReturning={switchToReturningForm}
+                />
+              </div>
+            ) : showReturningForm ? (
+              <div className="h-96">
+                <ReturningUserForm
+                  userEmail={returningEmail}
+                  setUserEmail={setReturningEmail}
+                  onSubmit={handleReturningSubmit}
+                  onSwitchToNew={switchToWelcomeForm}
+                  error={returningError}
+                  isLoading={isLoadingReturning}
                 />
               </div>
             ) : (
               <>
-                {/* Chat Messages Area */}
-                <div className="h-96 overflow-y-auto p-4 bg-gray-50">
-                  {isLoadingMessages ? (
+                <div className="h-96 overflow-y-auto p-4 bg-gray-50" ref={messageContainerRef} style={{ scrollBehavior: 'auto' }}>
+                  {isLoadingMessages && isInitialLoad ? (
                     <div className="flex justify-center items-center h-full">
                       <p className="text-gray-500">Loading messages...</p>
                     </div>
@@ -389,31 +586,38 @@ export default function ChatWidget({
                     messages.map((msg) => (
                       <div
                         key={msg.id}
-                        className={`mb-3 flex ${msg.sender === "client" ? "justify-end" : "justify-start"}`}
+                        className={`mb-3 flex flex-col ${msg.sender === "client" ? "items-end" : "items-start"}`}
                       >
                         <div
-                          className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                          className={`max-w-[75%] rounded-2xl px-4 py-2 cursor-pointer ${
                             msg.sender === "client"
                               ? "bg-primaryGreen text-white"
                               : "bg-white border border-gray-200"
                           }`}
+                          onClick={() => handleMessageClick(msg.id)}
                         >
                           {renderMessage(msg)}
                         </div>
+                        {clickedMessageId === msg.id && msg.createdAt && (
+                          <span className={`text-xs mt-1 px-1 ${
+                            msg.sender === "client" ? "text-gray-600" : "text-gray-500"
+                          }`}>
+                            {formatTimestamp(msg.createdAt)}
+                          </span>
+                        )}
                       </div>
                     ))
                   )}
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Chat Input */}
                 <div className="p-4 bg-white border-t border-gray-200">
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
                     >
-                      {IoImageOutline({ size: 20 })}
+                      {IoImageOutline ({size:20})} 
                     </button>
                     <input
                       type="text"
@@ -427,7 +631,7 @@ export default function ChatWidget({
                       onClick={handleSendMessage}
                       className="p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors"
                     >
-                      {IoSend({ size: 20 })}
+                      {IoSend ({size:20})} 
                     </button>
                   </div>
                 </div>
@@ -436,13 +640,12 @@ export default function ChatWidget({
           </div>
         )}
 
-        {/* Chat Button - Only show when closed */}
         {!isOpen && (
           <button
             onClick={() => setIsOpen(true)}
             className="bg-primaryGreen text-white p-4 rounded-full shadow-lg hover:bg-hoverGreen transition-colors"
           >
-            {IoChatbubbleEllipsesOutline({ size: 25 })}
+            {IoChatbubbleEllipsesOutline ({size:25})} 
           </button>
         )}
       </div>
@@ -450,11 +653,10 @@ export default function ChatWidget({
       {/* MOBILE FULL-SCREEN CHAT */}
       {isOpen && (
         <div className="lg:hidden fixed inset-0 bg-white z-50 flex flex-col">
-          {/* Mobile Chat Header */}
           <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0">
             <div className="flex items-center gap-3">
               <button onClick={() => setIsOpen(false)} className="p-2 -ml-2">
-                {FaChevronLeft({ size: 20 })}
+                {FaChevronLeft ({size:20})} 
               </button>
               {businessLogo ? (
                 <img 
@@ -469,7 +671,6 @@ export default function ChatWidget({
             </div>
           </div>
 
-          {/* Mobile Content */}
           {showWelcomeForm ? (
             <div className="flex-1">
               <WelcomeForm 
@@ -478,13 +679,24 @@ export default function ChatWidget({
                 userEmail={userEmail}
                 setUserEmail={setUserEmail}
                 onSubmit={handleWelcomeSubmit}
+                onSwitchToReturning={switchToReturningForm}
+              />
+            </div>
+          ) : showReturningForm ? (
+            <div className="flex-1">
+              <ReturningUserForm
+                userEmail={returningEmail}
+                setUserEmail={setReturningEmail}
+                onSubmit={handleReturningSubmit}
+                onSwitchToNew={switchToWelcomeForm}
+                error={returningError}
+                isLoading={isLoadingReturning}
               />
             </div>
           ) : (
             <>
-              {/* Mobile Messages Area */}
-              <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-                {isLoadingMessages ? (
+              <div className="flex-1 overflow-y-auto p-4 bg-gray-50" ref={mobileMessageContainerRef} style={{ scrollBehavior: 'auto' }}>
+                {isLoadingMessages && isInitialLoad ? (
                   <div className="flex justify-center items-center h-full">
                     <p className="text-gray-500">Loading messages...</p>
                   </div>
@@ -496,31 +708,38 @@ export default function ChatWidget({
                   messages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`mb-4 flex ${msg.sender === "client" ? "justify-end" : "justify-start"}`}
+                      className={`mb-4 flex flex-col ${msg.sender === "client" ? "items-end" : "items-start"}`}
                     >
                       <div
-                        className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                        className={`max-w-[75%] rounded-2xl px-4 py-2 cursor-pointer ${
                           msg.sender === "client"
                             ? "bg-primaryGreen text-white"
                             : "bg-white border border-gray-200"
                         }`}
+                        onClick={() => handleMessageClick(msg.id)}
                       >
                         {renderMessage(msg)}
                       </div>
+                      {clickedMessageId === msg.id && msg.createdAt && (
+                        <span className={`text-xs mt-1 px-1 ${
+                          msg.sender === "client" ? "text-gray-600" : "text-gray-500"
+                        }`}>
+                          {formatTimestamp(msg.createdAt)}
+                        </span>
+                      )}
                     </div>
                   ))
                 )}
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Mobile Input Area */}
               <div className="bg-white border-t border-gray-200 px-4 py-3">
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2 text-gray-500"
                   >
-                      {IoImageOutline({ size: 24 })}
+                      {IoImageOutline ({size:24})} 
                   </button>
                   <input
                     type="text"
@@ -534,7 +753,7 @@ export default function ChatWidget({
                     onClick={handleSendMessage}
                     className="p-2 text-primaryGreen"
                   >
-                      {IoSend({ size: 24 })}
+                      {IoSend ({size:24})} 
                   </button>
                 </div>
               </div>
