@@ -15,6 +15,70 @@ export default function BusinessSidebar() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bulkStartTime, setBulkStartTime] = useState('09:00');
+  const [bulkEndTime, setBulkEndTime] = useState('17:00');
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+
+  const dayGroups = {
+    'weekdays': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    'weekend': ['Saturday', 'Sunday'],
+    'all': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  };
+
+  const toggleDaySelection = (day: string) => {
+    setSelectedDays(prev => 
+      prev.includes(day) 
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
+  const selectDayGroup = (group: 'weekdays' | 'weekend' | 'all') => {
+    setSelectedDays(dayGroups[group]);
+  };
+
+    const applyBulkHours = () => {
+    if (selectedDays.length === 0) {
+      alert('Please select at least one day');
+      return;
+    }
+
+    if (!bulkStartTime || !bulkEndTime) {
+      alert('Please set both start and end times');
+      return;
+    }
+
+    const newHours = [...formData.businessHours];
+    selectedDays.forEach(selectedDay => {
+      const index = newHours.findIndex(item => item.day === selectedDay);
+      if (index !== -1) {
+        newHours[index] = {
+          ...newHours[index],
+          startTime: bulkStartTime,
+          endTime: bulkEndTime,
+          enabled: true
+        };
+      }
+    });
+
+    setFormData({ ...formData, businessHours: newHours });
+    setSelectedDays([]);
+  };
+
+  const clearAllHours = () => {
+    if (window.confirm('Are you sure you want to clear all business hours?')) {
+      setFormData({
+        ...formData,
+        businessHours: formData.businessHours.map(day => ({
+          ...day,
+          startTime: '',
+          endTime: '',
+          enabled: false
+        }))
+      });
+    }
+  };
+
 
   const [formData, setFormData] = useState({
     businessName: '',
@@ -484,110 +548,202 @@ export default function BusinessSidebar() {
 
           {/* Business Hours Section */}
           <div className='bg-white mt-2'>
-            <button
-              onClick={() => setIsHoursOpen(!isHoursOpen)}
-              className='w-full px-6 py-4 flex items-center justify-between'
-            >
-              <div className='flex items-center gap-3'>
-                {FaRegClock ({size:20, className:"text-gray-700"})}
-                <span className='font-semibold'>Business Hours</span>
-              </div>
-              {isHoursOpen ? FaAngleUp ({size:16}) : FaAngleDown ({size:16}) }
+          <button
+            onClick={() => setIsHoursOpen(!isHoursOpen)}
+            className='w-full px-6 py-4 flex items-center justify-between'
+          >
+            <div className='flex items-center gap-3'>
+              {FaRegClock ({size:20, className:"text-gray-700"})}
+              <span className='font-semibold'>Business Hours</span>
+            </div>
+            {isHoursOpen ? FaAngleUp ({size:16}) : FaAngleDown ({size:16}) }
+          </button>
+          {isHoursOpen && (
+            <div className='px-6 pb-4'>
+              {isEditing ? (
+                <div className='space-y-4'>
+                  {/* Quick Set Section */}
+                  <div className="bg-gradient-to-br from-emerald-50 to-blue-50 border border-emerald-200 rounded-lg p-3">
+                    <h3 className="text-xs font-semibold mb-2 flex items-center gap-1">
+                      <span className="text-emerald-600">⚡</span>
+                      Quick Set
+                    </h3>
 
-            </button>
-            {isHoursOpen && (
-              <div className='px-6 pb-4'>
-                {isEditing ? (
-                  <div className='space-y-3'>
-                    {formData.businessHours.map((item, index) => (
-                      <div key={index} className='space-y-2'>
-                        <div className='flex items-center gap-2'>
-                          <input
-                            type="checkbox"
-                            checked={item.enabled}
-                            onChange={(e) => handleTimeChange(index, 'enabled', e.target.checked)}
-                            className='w-4 h-4'
-                          />
-                          <span className='text-sm font-medium'>{item.day}</span>
-                        </div>
-                        
-                        {item.enabled && (
-                          <div className='flex items-center w-full gap-2 ml-6'>
-                            <input
-                              type="time"
-                              value={item.startTime}
-                              onChange={(e) => handleTimeChange(index, 'startTime', e.target.value)}
-                              className='flex-1 px-2 py-1 border border-gray-300 rounded text-sm'
-                            />
-                            <span>to</span>
-                            <input
-                              type="time"
-                              value={item.endTime}
-                              onChange={(e) => handleTimeChange(index, 'endTime', e.target.value)}
-                              className='flex-1 px-2 py-1 border border-gray-300 rounded text-sm'
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-
-                    <div className='pt-3'>
-                      <label htmlFor="timezone" className="block text-xs font-medium text-gray-700 mb-1">
-                        Timezone
-                      </label>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setIsTimezoneOpen(!isTimezoneOpen)}
-                          className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-left flex items-center justify-between"
-                          disabled={loading}
-                        >
-                          <span className={formData.timezone ? 'text-gray-800' : 'text-gray-400'}>
-                            {formData.timezone ? getTimezoneLabel(formData.timezone) : 'Select timezone'}
-                          </span>
-                          {isTimezoneOpen ? FaAngleUp ({className:"text-gray-400" }) : FaAngleDown ({className:"text-gray-400" })}
-                        </button>
-        
-                        {isTimezoneOpen && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                            {timezones.map((tz) => (
-                              <button
-                                key={tz.value}
-                                type="button"
-                                onClick={() => handleSelectTimezone(tz.value)}
-                                className="w-full px-3 py-2 text-sm hover:bg-emerald-50 transition-colors"
-                              >
-                                {tz.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                    {/* Quick Select Buttons */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <button
+                        onClick={() => selectDayGroup('weekdays')}
+                        className="px-2.5 py-1 text-xs font-medium bg-white border border-gray-300 rounded hover:bg-emerald-50 hover:border-emerald-500 transition"
+                      >
+                        Mon-Fri
+                      </button>
+                      <button
+                        onClick={() => selectDayGroup('weekend')}
+                        className="px-2.5 py-1 text-xs font-medium bg-white border border-gray-300 rounded hover:bg-emerald-50 hover:border-emerald-500 transition"
+                      >
+                        Weekend
+                      </button>
+                      <button
+                        onClick={() => selectDayGroup('all')}
+                        className="px-2.5 py-1 text-xs font-medium bg-white border border-gray-300 rounded hover:bg-emerald-50 hover:border-emerald-500 transition"
+                      >
+                        All Days
+                      </button>
+                    </div>
+              
+                    {/* Individual Day Selection */}
+                    <div className="mb-3">
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {formData.businessHours.map((day) => (
+                          <button
+                            key={day.day}
+                            onClick={() => toggleDaySelection(day.day)}
+                            className={`px-2 py-1.5 text-xs font-medium rounded border transition ${
+                              selectedDays.includes(day.day)
+                                ? 'bg-emerald-500 text-white border-emerald-600'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-emerald-500'
+                            }`}
+                          >
+                            {day.day.substring(0, 3)}
+                          </button>
+                        ))}
                       </div>
                     </div>
-
-          
-                  </div>
-                ) : (
-                  <div className='space-y-2'>
-                    {activeBusinessHours.map((item, index) => (
-                      <div key={index} className='flex justify-between text-sm'>
-                        <span className='text-gray-700'>{item.day.substring(0, 3)}</span>
-                        <span className='text-gray-600'>
-                          {formatTime(item.startTime)} - {formatTime(item.endTime)}
-                        </span>
+                      
+                    {/* Time Selection */}
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Start</label>
+                        <input
+                          type="time"
+                          value={bulkStartTime}
+                          onChange={(e) => setBulkStartTime(e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                        />
                       </div>
-                    ))}
-                    {activeBusinessHours.length === 0 && (
-                      <p className='text-sm text-gray-500 italic'>No business hours set</p>
-                    )}
-                    <p className='text-xs text-gray-500 text-center mt-4 italic'>
-                      Time zone ({formData.timezone})
-                    </p>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">End</label>
+                        <input
+                          type="time"
+                          value={bulkEndTime}
+                          onChange={(e) => setBulkEndTime(e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                    </div>
+                      
+                    {/* Apply Button */}
+                    <button
+                      onClick={applyBulkHours}
+                      disabled={selectedDays.length === 0}
+                      className="w-full btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Apply to {selectedDays.length > 0 ? `${selectedDays.length} day${selectedDays.length > 1 ? 's' : ''}` : 'Days'}
+                    </button>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                      
+                  {/* Individual Schedule */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-semibold text-gray-700">Individual Hours</span>
+                      <button
+                        onClick={clearAllHours}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                      
+                    <div className='space-y-3'>
+                      {formData.businessHours.map((item, index) => (
+                        <div key={index} className='space-y-2'>
+                          <div className='flex items-center gap-2'>
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={(e) => handleTimeChange(index, 'enabled', e.target.checked)}
+                              className='w-4 h-4'
+                            />
+                            <span className='text-sm font-medium'>{item.day}</span>
+                          </div>
+
+                          {item.enabled && (
+                            <div className='flex items-center gap-2 ml-6'>
+                              <input
+                                type="time"
+                                value={item.startTime}
+                                onChange={(e) => handleTimeChange(index, 'startTime', e.target.value)}
+                                className='flex-1 px-2 py-1 border border-gray-300 rounded text-sm'
+                              />
+                              <span>to</span>
+                              <input
+                                type="time"
+                                value={item.endTime}
+                                onChange={(e) => handleTimeChange(index, 'endTime', e.target.value)}
+                                className='flex-1 px-2 py-1 border border-gray-300 rounded text-sm'
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      <div className='pt-3'>
+                        <label htmlFor="timezone" className="block text-xs font-medium text-gray-700 mb-1">
+                          Timezone
+                        </label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsTimezoneOpen(!isTimezoneOpen)}
+                            className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-left flex items-center justify-between"
+                            disabled={loading}
+                          >
+                            <span className={formData.timezone ? 'text-gray-800' : 'text-gray-400'}>
+                              {formData.timezone ? getTimezoneLabel(formData.timezone) : 'Select timezone'}
+                            </span>
+                            {isTimezoneOpen ? FaAngleUp ({className:"text-gray-400" }) : FaAngleDown ({className:"text-gray-400" })}
+                          </button>
+                    
+                          {isTimezoneOpen && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {timezones.map((tz) => (
+                                <button
+                                  key={tz.value}
+                                  type="button"
+                                  onClick={() => handleSelectTimezone(tz.value)}
+                                  className="w-full px-3 py-2 text-sm hover:bg-emerald-50 transition-colors"
+                                >
+                                  {tz.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className='space-y-2'>
+                  {activeBusinessHours.map((item, index) => (
+                    <div key={index} className='flex justify-between text-sm'>
+                      <span className='text-gray-700'>{item.day.substring(0, 3)}</span>
+                      <span className='text-gray-600'>
+                        {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                      </span>
+                    </div>
+                  ))}
+                  {activeBusinessHours.length === 0 && (
+                    <p className='text-sm text-gray-500 italic'>No business hours set</p>
+                  )}
+                  <p className='text-xs text-gray-500 text-center mt-4 italic'>
+                    Time zone ({formData.timezone})
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
 
           {/* Location Section */}
@@ -845,105 +1001,198 @@ export default function BusinessSidebar() {
             {isHoursOpen ? FaAngleUp ({}) : FaAngleDown ({}) }
           </button>
 
-        {isHoursOpen && (
-        <div className='mt-4'>
-          {isEditing ? (
-            <div className='space-y-3'>
-                {formData.businessHours.map((item, index) => (
-                <div key={index} className='space-y-2'>
-                  <div className='flex items-center gap-2'>
-                    <input
-                      type="checkbox"
-                      checked={item.enabled}
-                      onChange={(e) => handleTimeChange(index, 'enabled', e.target.checked)}
-                      className='w-4 h-4'
-                    />
-                    <span className='text-sm font-medium'>{item.day}</span>
-                  </div>
-                  
-                  {item.enabled && (
-                    <div className='flex flex-col gap-2 ml-6'>
-                      <div className='flex items-center gap-1'>
-                        <input
-                          type="time"
-                          value={item.startTime}
-                          onChange={(e) => handleTimeChange(index, 'startTime', e.target.value)}
-                          className='w-24 px-2 py-1 border border-gray-300 rounded text-xs'
-                        />
-                      </div>
-                      <span className='text-xs text-gray-500'>to</span>
-                      <div className='flex items-center gap-1'>
-                        <input
-                          type="time"
-                          value={item.endTime}
-                          onChange={(e) => handleTimeChange(index, 'endTime', e.target.value)}
-                          className='w-24 px-2 py-1 border border-gray-300 rounded text-xs'
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+          {isHoursOpen && (
+            <div className='mt-4'>
+              {isEditing ? (
+                <div className='space-y-4'>
+                  {/* Quick Set Section */}
+                  <div className="bg-gradient-to-br from-emerald-50 to-blue-50 border border-emerald-200 rounded-lg p-3">
+                    <h3 className="text-xs font-semibold mb-2 flex items-center gap-1">
+                      <span className="text-emerald-600">⚡</span>
+                      Quick Set
+                    </h3>
 
-              <div className='pt-3'>
-                <label htmlFor="timezone" className="block text-xs font-medium text-gray-700 mb-1">
-                  Timezone
-                </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsTimezoneOpen(!isTimezoneOpen)}
-                    className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-left flex items-center justify-between"
-                    disabled={loading}
-                  >
-                    <span className={formData.timezone ? 'text-gray-800' : 'text-gray-400'}>
-                      {formData.timezone ? getTimezoneLabel(formData.timezone) : 'Select timezone'}
-                    </span>
-                    {isTimezoneOpen ? FaAngleUp ({className:"text-gray-400" }) : FaAngleDown ({className:"text-gray-400" })}
-                  </button>
-  
-                  {isTimezoneOpen && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {timezones.map((tz) => (
-                        <button
-                          key={tz.value}
-                          type="button"
-                          onClick={() => handleSelectTimezone(tz.value)}
-                          className="w-full px-3 py-2 text-sm hover:bg-emerald-50 transition-colors"
-                        >
-                          {tz.label}
-                        </button>
-                      ))}
+                    {/* Quick Select Buttons */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <button
+                        onClick={() => selectDayGroup('weekdays')}
+                        className="px-2 py-1 text-xs font-medium bg-white border border-gray-300 rounded hover:bg-emerald-50 hover:border-emerald-500 transition"
+                      >
+                        Mon-Fri
+                      </button>
+                      <button
+                        onClick={() => selectDayGroup('weekend')}
+                        className="px-2 py-1 text-xs font-medium bg-white border border-gray-300 rounded hover:bg-emerald-50 hover:border-emerald-500 transition"
+                      >
+                        Weekend
+                      </button>
+                      <button
+                        onClick={() => selectDayGroup('all')}
+                        className="px-2 py-1 text-xs font-medium bg-white border border-gray-300 rounded hover:bg-emerald-50 hover:border-emerald-500 transition"
+                      >
+                        All Days
+                      </button>
                     </div>
-                  )}
-                </div>
-              </div>
-
               
-            </div>
-          ) : (
-            <>
-              <div className='space-y-2'>
-                {activeBusinessHours.map((item, index) => (
-                  <div key={index} className='flex justify-between text-sm'>
-                    <span className='text-gray-700'>{item.day.substring(0, 3)}</span>
-                    <span className='text-gray-600'>
-                      {formatTime(item.startTime)} - {formatTime(item.endTime)}
-                    </span>
+                    {/* Individual Day Selection */}
+                    <div className="mb-3">
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {formData.businessHours.map((day) => (
+                          <button
+                            key={day.day}
+                            onClick={() => toggleDaySelection(day.day)}
+                            className={`px-2 py-1 text-xs font-medium rounded border transition ${
+                              selectedDays.includes(day.day)
+                                ? 'bg-emerald-500 text-white border-emerald-600'
+                                : 'bg-white text-gray-700 border-gray-300 hover:border-emerald-500'
+                            }`}
+                          >
+                            {day.day.substring(0, 3)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                      
+                    {/* Time Selection */}
+                    <div className="space-y-2 mb-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Start</label>
+                        <input
+                          type="time"
+                          value={bulkStartTime}
+                          onChange={(e) => setBulkStartTime(e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">End</label>
+                        <input
+                          type="time"
+                          value={bulkEndTime}
+                          onChange={(e) => setBulkEndTime(e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                    </div>
+                      
+                    {/* Apply Button */}
+                    <button
+                      onClick={applyBulkHours}
+                      disabled={selectedDays.length === 0}
+                      className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      Apply to {selectedDays.length > 0 ? `${selectedDays.length} day${selectedDays.length > 1 ? 's' : ''}` : 'Days'}
+                    </button>
                   </div>
-                ))}
-                {activeBusinessHours.length === 0 && (
-                  <p className='text-sm text-gray-500 italic'>No business hours set</p>
-                )}
-              </div>
-              <p className='text-xs text-gray-600 text-center mt-6 italic opacity-70'>
-                  Time zone ({formData.timezone})
-              </p>
-            </>
+                      
+                  {/* Individual Schedule */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-semibold text-gray-700">Individual Hours</span>
+                      <button
+                        onClick={clearAllHours}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                      
+                    <div className='space-y-3'>
+                      {formData.businessHours.map((item, index) => (
+                        <div key={index} className='space-y-2'>
+                          <div className='flex items-center gap-2'>
+                            <input
+                              type="checkbox"
+                              checked={item.enabled}
+                              onChange={(e) => handleTimeChange(index, 'enabled', e.target.checked)}
+                              className='w-4 h-4'
+                            />
+                            <span className='text-sm font-medium'>{item.day}</span>
+                          </div>
+
+                          {item.enabled && (
+                            <div className='flex flex-col gap-2 ml-6'>
+                              <div className='flex items-center gap-1'>
+                                <input
+                                  type="time"
+                                  value={item.startTime}
+                                  onChange={(e) => handleTimeChange(index, 'startTime', e.target.value)}
+                                  className='w-34 px-2 py-1 border border-gray-300 rounded text-xs'
+                                />
+                              </div>
+                              <span className='text-xs text-gray-500'>to</span>
+                              <div className='flex items-center gap-1'>
+                                <input
+                                  type="time"
+                                  value={item.endTime}
+                                  onChange={(e) => handleTimeChange(index, 'endTime', e.target.value)}
+                                  className='w-34 px-2 py-1 border border-gray-300 rounded text-xs'
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      <div className='pt-3'>
+                        <label htmlFor="timezone" className="block text-xs font-medium text-gray-700 mb-1">
+                          Timezone
+                        </label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsTimezoneOpen(!isTimezoneOpen)}
+                            className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white text-left flex items-center justify-between"
+                            disabled={loading}
+                          >
+                            <span className={formData.timezone ? 'text-gray-800' : 'text-gray-400'}>
+                              {formData.timezone ? getTimezoneLabel(formData.timezone) : 'Select timezone'}
+                            </span>
+                            {isTimezoneOpen ? FaAngleUp ({className:"text-gray-400" }) : FaAngleDown ({className:"text-gray-400" })}
+                          </button>
+                    
+                          {isTimezoneOpen && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {timezones.map((tz) => (
+                                <button
+                                  key={tz.value}
+                                  type="button"
+                                  onClick={() => handleSelectTimezone(tz.value)}
+                                  className="w-full px-3 py-2 text-sm hover:bg-emerald-50 transition-colors"
+                                >
+                                  {tz.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className='space-y-2'>
+                    {activeBusinessHours.map((item, index) => (
+                      <div key={index} className='flex justify-between text-sm'>
+                        <span className='text-gray-700'>{item.day.substring(0, 3)}</span>
+                        <span className='text-gray-600'>
+                          {formatTime(item.startTime)} - {formatTime(item.endTime)}
+                        </span>
+                      </div>
+                    ))}
+                    {activeBusinessHours.length === 0 && (
+                      <p className='text-sm text-gray-500 italic'>No business hours set</p>
+                    )}
+                  </div>
+                  <p className='text-xs text-gray-600 text-center mt-6 italic opacity-70'>
+                      Time zone ({formData.timezone})
+                  </p>
+                </>
+              )}
+            </div>
           )}
         </div>
-      )}
-    </div>
 
     {/* Location Section */}
     <div className='mt-8 w-full pt-4'>

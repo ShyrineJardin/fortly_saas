@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { FaAngleUp, FaAngleDown } from "react-icons/fa6";
 import { CiCircleChevRight } from "react-icons/ci";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 interface ServiceProps {
   id: string | number;
@@ -24,10 +24,11 @@ export default function ServiceCard({
 }: ServiceProps) {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate(); 
+  const { businessSlug } = useParams<{ businessSlug: string }>(); // Get business slug
 
   const handleBooking = () => {
     const serviceData = { id, title, duration, price, description, image };
-    navigate("/booking", { state: { selectedService: serviceData } });
+    navigate(`/${businessSlug}/booking`, { state: { selectedService: serviceData } });
   };
 
   return (
