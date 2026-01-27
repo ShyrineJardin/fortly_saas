@@ -70,9 +70,9 @@ class GoogleCalendarService {
   }
 
   /**
-   * Create a calendar event for a booking
+   * Create a calendar event for a booking with chat message information
    */
-  async createBookingEvent(booking, business, service, calendarTokens) {
+  async createBookingEvent(booking, business, service, calendarTokens, chatMessages = []) {
     try {
       this.setCredentials(calendarTokens);
 
@@ -88,13 +88,14 @@ class GoogleCalendarService {
 
       const endDateTime = startDateTime.clone().add(duration, 'minutes');
 
-      // Create event description with booking details
-      const description = this.createEventDescription(booking, service, business);
+      // Create event description with booking details AND chat messages
+      const description = this.createEventDescription(booking, service, business, chatMessages);
 
       // Create the event
       const event = {
         summary: `${service.name} - ${booking.clientName}`,
         description: description,
+        location: booking.clientAddress || business.location || '',
         start: {
           dateTime: startDateTime.toISOString(),
           timeZone: business.timezone
@@ -120,9 +121,13 @@ class GoogleCalendarService {
             bookingId: booking.id,
             businessId: business.id,
             serviceId: service.id,
-            clientEmail: booking.clientEmail
+            clientEmail: booking.clientEmail,
+            hasChatHistory: String(chatMessages.length > 0),
+            chatMessageCount: String(chatMessages.length)
           }
-        }
+        },
+        // Color coding based on status
+        colorId: this.getEventColor(booking.status)
       };
 
       const response = await this.calendar.events.insert({
@@ -132,6 +137,8 @@ class GoogleCalendarService {
       });
 
       console.log('✅ Calendar event created:', response.data.id);
+      console.log('📧 Calendar invites sent to:', booking.clientEmail, 'and', business.email);
+      
       return response.data;
 
     } catch (error) {
@@ -143,7 +150,7 @@ class GoogleCalendarService {
   /**
    * Update an existing calendar event
    */
-  async updateBookingEvent(eventId, booking, business, service, calendarTokens) {
+  async updateBookingEvent(eventId, booking, business, service, calendarTokens, chatMessages = []) {
     try {
       this.setCredentials(calendarTokens);
 
@@ -159,7 +166,8 @@ class GoogleCalendarService {
 
       const event = {
         summary: `${service.name} - ${booking.clientName}`,
-        description: this.createEventDescription(booking, service, business),
+        description: this.createEventDescription(booking, service, business, chatMessages),
+        location: booking.clientAddress || business.location || '',
         start: {
           dateTime: startDateTime.toISOString(),
           timeZone: business.timezone
@@ -171,7 +179,18 @@ class GoogleCalendarService {
         attendees: [
           { email: booking.clientEmail, displayName: booking.clientName },
           { email: business.email, displayName: business.businessName }
-        ]
+        ],
+        extendedProperties: {
+          private: {
+            bookingId: booking.id,
+            businessId: business.id,
+            serviceId: service.id,
+            clientEmail: booking.clientEmail,
+            hasChatHistory: String(chatMessages.length > 0),
+            chatMessageCount: String(chatMessages.length)
+          }
+        },
+        colorId: this.getEventColor(booking.status)
       };
 
       const response = await this.calendar.events.update({
@@ -182,6 +201,8 @@ class GoogleCalendarService {
       });
 
       console.log('✅ Calendar event updated:', eventId);
+      console.log('📧 Update notifications sent to attendees');
+      
       return response.data;
 
     } catch (error) {
@@ -204,6 +225,8 @@ class GoogleCalendarService {
       });
 
       console.log('✅ Calendar event deleted:', eventId);
+      console.log('📧 Cancellation notifications sent to attendees');
+      
       return true;
 
     } catch (error) {
@@ -236,29 +259,100 @@ class GoogleCalendarService {
   }
 
   /**
-   * Create detailed event description
+   * Create detailed event description with chat history
    */
-  createEventDescription(booking, service, business) {
-    let description = `📅 Booking Details\n\n`;
-    description += `Service: ${service.name}\n`;
-    description += `Duration: ${service.duration}\n`;
-    description += `Price: ${service.price}\n\n`;
-    description += `👤 Client Information\n`;
-    description += `Name: ${booking.clientName}\n`;
-    description += `Email: ${booking.clientEmail}\n`;
-    description += `Phone: ${booking.clientPhone || 'N/A'}\n\n`;
-    description += `🏢 Business Information\n`;
-    description += `Name: ${business.businessName}\n`;
-    description += `Location: ${business.location || 'N/A'}\n`;
+  createEventDescription(booking, service, business, chatMessages = []) {
+    let description = `📅 BOOKING DETAILS\n`;
+    description += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
     
+    // Service Information
+    description += `🛠️ SERVICE\n`;
+    description += `   Name: ${service.name}\n`;
+    description += `   Duration: ${service.duration}\n`;
+    description += `   Price: ${service.price}\n`;
+    if (service.description) {
+      description += `   Description: ${service.description}\n`;
+    }
+    description += `\n`;
+    
+    // Client Information
+    description += `👤 CLIENT INFORMATION\n`;
+    description += `   Name: ${booking.clientName}\n`;
+    description += `   Email: ${booking.clientEmail}\n`;
+    description += `   Phone: ${booking.clientPhone || 'N/A'}\n`;
+    if (booking.clientAddress) {
+      description += `   Address: ${booking.clientAddress}\n`;
+    }
+    description += `\n`;
+    
+    // Business Information
+    description += `🏢 BUSINESS INFORMATION\n`;
+    description += `   Name: ${business.businessName}\n`;
+    description += `   Email: ${business.email}\n`;
+    if (business.phone) {
+      description += `   Phone: ${business.phone}\n`;
+    }
+    if (business.location) {
+      description += `   Location: ${business.location}\n`;
+    }
+    description += `\n`;
+    
+    // Booking Status
+    description += `📊 STATUS\n`;
+    description += `   Current Status: ${booking.status.toUpperCase()}\n`;
+    description += `   Booking ID: ${booking.id}\n`;
+    description += `   Created: ${moment(booking.createdAt).format('MMMM D, YYYY h:mm A')}\n`;
+    description += `\n`;
+    
+    // Special Notes
     if (booking.notes) {
-      description += `\n📝 Special Notes\n${booking.notes}\n`;
+      description += `📝 SPECIAL NOTES\n`;
+      description += `   ${booking.notes}\n\n`;
     }
 
-    description += `\n🔗 Booking ID: ${booking.id}`;
-    description += `\nStatus: ${booking.status.toUpperCase()}`;
+    // Chat Message History
+    if (chatMessages && chatMessages.length > 0) {
+      description += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+      description += `💬 CHAT HISTORY (${chatMessages.length} messages)\n`;
+      description += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      
+      // Show most recent 5 messages
+      const recentMessages = chatMessages.slice(-5);
+      
+      recentMessages.forEach((msg, index) => {
+        const sender = msg.senderType === 'business' ? business.businessName : booking.clientName;
+        const timestamp = moment(msg.createdAt).format('MMM D, h:mm A');
+        
+        description += `[${timestamp}] ${sender}:\n`;
+        description += `${msg.message}\n\n`;
+      });
+      
+      if (chatMessages.length > 5) {
+        description += `... and ${chatMessages.length - 5} earlier messages\n\n`;
+      }
+      
+      description += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    }
+
+    // Footer
+    description += `\n📱 View full details at: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/${business.slug}\n`;
+    description += `\nThis event was automatically created by the booking system.\n`;
 
     return description;
+  }
+
+  /**
+   * Get event color based on booking status
+   */
+  getEventColor(status) {
+    const colorMap = {
+      'pending': '5',    // Yellow - awaiting confirmation
+      'confirmed': '10', // Green - confirmed
+      'completed': '9',  // Blue - completed
+      'cancelled': '11'  // Red - cancelled
+    };
+    
+    return colorMap[status] || '7'; // Gray as default
   }
 
   /**

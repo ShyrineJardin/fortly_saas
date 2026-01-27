@@ -18,6 +18,8 @@ export default function Confirmation() {
     const bookingDate = location.state?.bookingDate;
     const bookingTime = location.state?.bookingTime;
     const customerInfo = location.state?.customerInfo;
+    const bookingData = location.state?.booking;
+    const bookingDetails = location.state?.bookingDetails;
 
     // Fetch business data from API (same as ClientSidebar)
     useEffect(() => {
@@ -36,7 +38,139 @@ export default function Confirmation() {
         }
     };
 
+    const formatDate = (dateString: string | undefined) => {
+        console.log('🔄 Formatting date:', dateString);
+        
+        if (!dateString) {
+            console.warn('⚠️ No date string provided');
+            return 'Date not set';
+        }
+        
+        try {
+            const date = new Date(dateString);
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                console.error('❌ Invalid date:', dateString);
+                return dateString; 
+            }
+            
+            return date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        } catch (error) {
+            console.error('❌ Error formatting date:', error);
+            return dateString;
+        }
+    };
+
+    const formatTime = (timeString: string | undefined) => {
+        console.log('🔄 Formatting time:', timeString);
+        
+        if (!timeString) {
+            console.warn('⚠️ No time string provided');
+            return 'Time not set';
+        }
+        
+        try {
+            const timeParts = timeString.split(':');
+            if (timeParts.length < 2) {
+                console.error('❌ Invalid time format:', timeString);
+                return timeString;
+            }
+            
+            const hours = parseInt(timeParts[0], 10);
+            const minutes = parseInt(timeParts[1], 10);
+            
+            if (isNaN(hours) || isNaN(minutes)) {
+                console.error('❌ Invalid time values:', timeString);
+                return timeString;
+            }
+            
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+            
+            return `${displayHour}:${String(minutes).padStart(2, '0')} ${ampm}`;
+        } catch (error) {
+            console.error('❌ Error formatting time:', error);
+            return timeString;
+        }
+    };
+
+    const calculateEndTime = (startTime: string | undefined, duration: string | undefined) => {
+        if (!startTime || !duration) {
+            console.warn('⚠️ Missing startTime or duration');
+            return '';
+        }
+        
+             try {
+            const timeParts = startTime.split(':');
+            if (timeParts.length < 2) return '';
+            
+            const hours = parseInt(timeParts[0], 10);
+            const minutes = parseInt(timeParts[1], 10);
+            
+            if (isNaN(hours) || isNaN(minutes)) return '';
+            
+            let totalMinutes = hours * 60 + minutes;
+            
+            const durationMatch = duration.match(/^(\d+(?:\.\d+)?)\s*(\w+)$/);
+            if (!durationMatch) {
+                console.warn('⚠️ Could not parse duration:', duration);
+                return '';
+            }
+
+            const value = parseFloat(durationMatch[1]);
+            const unit = durationMatch[2].toLowerCase();
+
+            let durationMinutes = 0;
+            switch (unit) {
+                case 'minute':
+                case 'minutes':
+                case 'min':
+                case 'mins':
+                    durationMinutes = value;
+                    break;
+                case 'hour':
+                case 'hours':
+                case 'hr':
+                case 'hrs':
+                    durationMinutes = value * 60;
+                    break;
+                case 'day':
+                case 'days':
+                    console.log('📅 Multi-day service detected');
+                    return '';
+                default:
+                    durationMinutes = 60;
+            }
+
+            if (durationMinutes >= 1440) { 
+                console.log('📅 Duration is 24+ hours, not showing end time');
+                return '';
+            }
+
+            // Calculate end time
+            totalMinutes += durationMinutes;
+            const endHours = Math.floor(totalMinutes / 60) % 24;
+            const endMinutes = totalMinutes % 60;
+
+            // Format end time
+            const ampm = endHours >= 12 ? 'PM' : 'AM';
+            const displayHour = endHours > 12 ? endHours - 12 : endHours === 0 ? 12 : endHours;
+
+            return `${displayHour}:${String(endMinutes).padStart(2, '0')} ${ampm}`;
+        } catch (error) {
+            console.error('❌ Error calculating end time:', error);
+            return '';
+        }
+    };
+
     if (!selectedService) {
+        console.error('❌ No selected service found, redirecting...');
         return <Navigate to={`/${businessSlug}/services`} replace />;
     }
 
@@ -66,6 +200,38 @@ export default function Confirmation() {
     const handleBookAnother = () => {
         window.location.href = `/${businessSlug}/services`;
     };
+
+    // Try to get date/time from different possible sources
+    const finalDate = bookingDate || bookingDetails?.date || bookingData?.bookingDate;
+    const finalTime = bookingTime || bookingDetails?.time || bookingData?.bookingTime;
+    
+    const convertTo24Hour = (time12h: string) => {
+        const [time, modifier] = time12h.split(' ');
+        let [hours, minutes] = time.split(':');
+
+        if (hours === '12') {
+            hours = '00';
+        }
+
+        if (modifier === 'PM') {
+            hours = String(parseInt(hours, 10) + 12);
+        }
+
+        return `${hours.padStart(2, '0')}:${minutes}:00`;
+    };
+
+
+    const isDateAlreadyFormatted = finalDate?.includes(',');
+    const formattedDate = isDateAlreadyFormatted ? finalDate : formatDate(finalDate);
+
+    const isTimeAlreadyFormatted = finalTime?.includes('AM') || finalTime?.includes('PM');
+    const formattedStartTime = isTimeAlreadyFormatted ? finalTime : formatTime(finalTime);
+
+    let rawTime = finalTime;
+    if (isTimeAlreadyFormatted) {
+        rawTime = convertTo24Hour(finalTime);
+    }
+    const formattedEndTime = calculateEndTime(rawTime, selectedService?.duration);
 
     return (
         <div className='flex flex-col min-h-screen'>
@@ -131,7 +297,16 @@ export default function Confirmation() {
                     <div className="mt-8">
                         <p className="text-gray-500 lg:text-sm text-xs mb-1">Date & Time</p>
                         <h3 className="text-textPrimary font-medium lg:text-base text-sm">
-                            <span>{bookingDate || 'Sat 14 December 2023'}</span> | <span>{bookingTime || '10:30 AM to 10:45 AM'}</span>
+                            <span>{formattedDate}</span>
+                            {formattedStartTime && formattedStartTime !== 'Time not set' && (
+                                <>
+                                    {' | '}
+                                    <span>{formattedStartTime}</span>
+                                    {formattedEndTime && (
+                                        <span> to {formattedEndTime}</span>
+                                    )}
+                                </>
+                            )}
                         </h3>
                     </div>
 
@@ -167,7 +342,7 @@ export default function Confirmation() {
 
                     <div className="mt-6">
                         <p className="text-gray-600 lg:text-sm text-xs leading-relaxed text-center">
-                            You're all set! Your appointment has been added to your calendar. If it didn't appear, add it manually and make sure notifications are turned on.
+                            You're all set! Your appointment has been confirmed. You should receive a confirmation email and calendar invite shortly.
                         </p>
                     </div>
 
@@ -181,6 +356,7 @@ export default function Confirmation() {
                     </div>
                 </div>
             </main>
+            
         </div>
     );
 }

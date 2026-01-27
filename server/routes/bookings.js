@@ -90,17 +90,17 @@ router.post('/', async (req, res) => {
         businessId: business.id,
         clientEmail: clientEmail
       },
-      order: [['createdAt', 'DESC']],
-      limit: 10 // Get last 10 messages
+      order: [['createdAt', 'ASC']], // Get messages in chronological order
+      limit: 20 // Get last 20 messages for calendar event
     });
 
     // Attach chat reference to booking if messages exist
     if (chatMessages.length > 0) {
       await booking.update({
         hasChatHistory: true,
-        lastChatMessageAt: chatMessages[0].createdAt
+        lastChatMessageAt: chatMessages[chatMessages.length - 1].createdAt
       });
-      console.log('💬 Attached', chatMessages.length, 'chat messages to booking');
+      console.log('💬 Found', chatMessages.length, 'chat messages for this client');
     }
 
     // Include service details in response
@@ -112,16 +112,21 @@ router.post('/', async (req, res) => {
     try {
       // Check if business has Google Calendar connected
       if (business.googleCalendarTokens) {
+        console.log('📅 Creating calendar event with chat history...');
+        
         const calendarEvent = await googleCalendarService.createBookingEvent(
           booking,
           business,
           service,
-          JSON.parse(business.googleCalendarTokens)
+          JSON.parse(business.googleCalendarTokens),
+          chatMessages // Pass chat messages to calendar service
         );
         
         // Save calendar event ID
         await booking.update({ googleCalendarEventId: calendarEvent.id });
-        console.log('📅 Google Calendar event created');
+        console.log('✅ Google Calendar event created with', chatMessages.length, 'chat messages included');
+      } else {
+        console.log('⚠️ Google Calendar not connected for this business');
       }
     } catch (calendarError) {
       console.error('⚠️ Calendar sync failed (non-blocking):', calendarError.message);
@@ -135,7 +140,7 @@ router.post('/', async (req, res) => {
         business,
         service
       );
-      console.log('📧 Confirmation email sent');
+      console.log('📧 Confirmation email sent to:', booking.clientEmail);
     } catch (emailError) {
       console.error('⚠️ Email sending failed (non-blocking):', emailError.message);
     }
@@ -327,6 +332,16 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
 
     console.log('📝 Booking status updated:', { id: booking.id, oldStatus, newStatus: status });
 
+    // Get chat messages for calendar update
+    const chatMessages = await db.Message.findAll({
+      where: {
+        businessId: req.business.id,
+        clientEmail: booking.clientEmail
+      },
+      order: [['createdAt', 'ASC']],
+      limit: 20
+    });
+
     // Update Google Calendar event if connected
     try {
       const business = await db.Business.findByPk(req.business.id);
@@ -340,15 +355,16 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
           );
           console.log('📅 Calendar event deleted');
         } else {
-          // Update calendar event
+          // Update calendar event with latest chat messages
           await googleCalendarService.updateBookingEvent(
             booking.googleCalendarEventId,
             booking,
             business,
             booking.Service,
-            JSON.parse(business.googleCalendarTokens)
+            JSON.parse(business.googleCalendarTokens),
+            chatMessages // Include chat messages in update
           );
-          console.log('📅 Calendar event updated');
+          console.log('📅 Calendar event updated with', chatMessages.length, 'chat messages');
         }
       }
     } catch (calendarError) {
@@ -434,7 +450,7 @@ router.put('/:id/cancel', async (req, res) => {
       return res.status(400).json({ message: 'Booking is already cancelled' });
     }
 
-    await booking.update({ status: 'cancelled' });
+    await booking.update({ status: 'cancelled', cancelledBy: 'client' });
 
     // Update calendar if connected
     try {
@@ -443,6 +459,7 @@ router.put('/:id/cancel', async (req, res) => {
           booking.googleCalendarEventId,
           JSON.parse(booking.Business.googleCalendarTokens)
         );
+        console.log('📅 Calendar event deleted after client cancellation');
       }
     } catch (calendarError) {
       console.error('⚠️ Calendar update failed:', calendarError.message);
