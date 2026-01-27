@@ -15,6 +15,7 @@ const galleryRoutes = require('./routes/gallery');
 const bookingRoutes = require('./routes/bookings');
 const chatRoutes = require('./routes/chat');
 const reviewRoutes = require('./routes/reviews');
+const googleCalendarRoutes = require('./routes/googleCalendar'); 
 
 const app = express();
 const server = http.createServer(app);
@@ -128,6 +129,7 @@ app.use('/api/gallery', galleryRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/google-calendar', googleCalendarRoutes); 
 
 // Health check
 app.get('/api/health', (req, res) => {

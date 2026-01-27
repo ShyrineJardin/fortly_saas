@@ -21,13 +21,13 @@ import BusinessLayout from "./components/layout/BusinessLayout"
 import BusinessSidebar from "./components/business/BusinessSidebar"
 import BusinessTopTabs from "./components/business/BusinessTopTabs"
 
-// Unified Client Layout
+// Unified Client Layout (for gallery, services, reviews, booking)
 function UnifiedClientLayout() {
   const location = useLocation()
   const { pathname } = location
   
-  // Check if current route is booking or confirmation
-  const isBookingFlow = pathname.includes('/booking') || pathname.includes('/confirmation')
+  // Check if current route is booking
+  const isBookingFlow = pathname.includes('/booking')
   
   return (
     <div className='flex flex-col min-h-screen'>
@@ -102,15 +102,17 @@ export default function App() {
           <Route path="services" element={<BusinessServicePage />} />
         </Route>
 
-        {/* Client Routes - UNIFIED LAYOUT (no split) */}
+        {/* Client Routes - UNIFIED LAYOUT (for main pages) */}
         <Route path="/:businessSlug" element={<UnifiedClientLayout />}>
           <Route index element={<Navigate to="gallery" replace />} />
           <Route path="gallery" element={<GalleryGrid />} />
           <Route path="services" element={<ServicesPage />} />
           <Route path="reviews" element={<ReviewsPage />} />
           <Route path="booking" element={<BookingPage />} />
-          <Route path="confirmation" element={<ConfirmationPage />} />
         </Route>
+
+        {/* Confirmation Page - SEPARATE LAYOUT (uses ClientLayout internally) */}
+        <Route path="/:businessSlug/confirmation" element={<ConfirmationPage />} />
 
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/business/login" replace />} />

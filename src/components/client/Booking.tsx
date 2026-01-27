@@ -3,7 +3,7 @@ import { FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 import BookingPolicy from "../shared/BookingPolicy";
 import ServiceCard from "../shared/ServiceCard";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { authAPI } from "../../utils/api";
+import { authAPI, bookingsAPI } from "../../utils/api";
 
 export default function BookingPage() {
   const location = useLocation();
@@ -12,8 +12,9 @@ export default function BookingPage() {
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState("");
   
   const [formData, setFormData] = useState({
@@ -35,6 +36,7 @@ export default function BookingPage() {
 
   // Calendar state
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [minAdvanceDays, setMinAdvanceDays] = useState(0);
 
   const selectedService = location.state?.selectedService;
 
@@ -43,10 +45,10 @@ export default function BookingPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedDate && businessData) {
-      generateTimeSlots(selectedDate);
+    if (selectedDate && businessData && selectedService) {
+      fetchAvailableSlots(selectedDate);
     }
-  }, [selectedDate, businessData]);
+  }, [selectedDate, businessData, selectedService]);
 
   const loadBusinessData = async () => {
     try {
@@ -74,88 +76,33 @@ export default function BookingPage() {
     }
   };
 
-  const generateTimeSlots = (date: Date) => {
-    if (!businessData) return;
+  const fetchAvailableSlots = async (date: Date) => {
+    if (!selectedService || !businessSlug) return;
 
-    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
-    const daySchedule = businessData.schedules?.find((s: any) => s.dayOfWeek === dayOfWeek);
+    try {
+      setLoadingSlots(true);
+      const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      console.log('🔍 Fetching slots for:', { date: formattedDate, serviceId: selectedService.id });
 
-    console.log('🕐 Generating slots for:', { dayOfWeek, daySchedule });
+      const response = await bookingsAPI.getAvailableSlots(
+        businessSlug,
+        formattedDate,
+        { serviceId: selectedService.id }
+      );
 
-    if (!daySchedule || !daySchedule.enabled) {
+      console.log('✅ Received slots:', response.data);
+
+      setAvailableTimeSlots(response.data.availableSlots || []);
+      setMinAdvanceDays(response.data.minAdvanceDays || 0);
+      setSelectedTime(null); // Reset time selection when date changes
+
+    } catch (err: any) {
+      console.error('❌ Error fetching slots:', err);
+      setError(err.response?.data?.message || 'Failed to fetch available times');
       setAvailableTimeSlots([]);
-      return;
-    }
-
-    // Parse service duration
-    const serviceDuration = parseInt(selectedService.duration.match(/\d+/)?.[0] || '60');
-    
-    // Parse buffer time
-    const bufferMatch = businessData.bufferTime?.match(/^(\d+(?:\.\d+)?)\s*(\w+)$/);
-    let bufferMinutes = 15; // default
-    
-    if (bufferMatch) {
-      const value = parseFloat(bufferMatch[1]);
-      const unit = bufferMatch[2];
-      
-      switch(unit) {
-        case 'minutes': bufferMinutes = value; break;
-        case 'hours': bufferMinutes = value * 60; break;
-        case 'days': bufferMinutes = value * 24 * 60; break;
-        case 'weeks': bufferMinutes = value * 7 * 24 * 60; break;
-        case 'months': bufferMinutes = value * 30 * 24 * 60; break;
-      }
-    }
-
-    console.log('⏱️ Time calculation:', { serviceDuration, bufferMinutes });
-
-    // Generate time slots
-    const slots: string[] = [];
-    const [startHour, startMin] = daySchedule.startTime.split(':').map(Number);
-    const [endHour, endMin] = daySchedule.endTime.split(':').map(Number);
-    
-    let currentMinutes = startHour * 60 + startMin;
-    const endMinutes = endHour * 60 + endMin;
-    const slotInterval = serviceDuration + bufferMinutes;
-
-    while (currentMinutes + serviceDuration <= endMinutes) {
-      const hour = Math.floor(currentMinutes / 60);
-      const minute = currentMinutes % 60;
-      
-      // Convert to 12-hour format
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      const timeString = `${displayHour}:${String(minute).padStart(2, '0')} ${ampm}`;
-      
-      slots.push(timeString);
-      currentMinutes += slotInterval;
-    }
-
-    console.log('✅ Generated slots:', slots);
-    setAvailableTimeSlots(slots);
-  };
-
-  const getMinAdvanceDays = () => {
-    if (!businessData?.bufferTime) return 0;
-    
-    const bufferMatch = businessData.bufferTime.match(/^(\d+(?:\.\d+)?)\s*(\w+)$/);
-    if (!bufferMatch) return 0;
-    
-    const value = parseFloat(bufferMatch[1]);
-    const unit = bufferMatch[2];
-    
-    switch(unit) {
-      case 'minutes':
-      case 'hours':
-        return 0; // Same day booking allowed
-      case 'days':
-        return Math.ceil(value);
-      case 'weeks':
-        return Math.ceil(value * 7);
-      case 'months':
-        return Math.ceil(value * 30);
-      default:
-        return 0;
+    } finally {
+      setLoadingSlots(false);
     }
   };
 
@@ -170,7 +117,6 @@ export default function BookingPage() {
     if (date < today) return false;
     
     // Check minimum advance booking requirement
-    const minAdvanceDays = getMinAdvanceDays();
     const minDate = new Date(today);
     minDate.setDate(today.getDate() + minAdvanceDays);
     
@@ -187,7 +133,7 @@ export default function BookingPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedDate || !selectedTime) {
       setError("Please select a date and time");
       return;
@@ -203,21 +149,56 @@ export default function BookingPage() {
       return;
     }
 
-    navigate(`/${businessSlug}/confirmation`, { 
-      state: { 
-        selectedService: selectedService,
-        bookingDetails: { 
-          date: selectedDate.toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          }),
-          time: selectedTime,
-          ...formData
+    try {
+      setLoading(true);
+
+      // Find the selected time slot object
+      const selectedSlot = availableTimeSlots.find(slot => slot.display === selectedTime);
+      
+      // Format booking data
+      const bookingData = {
+        businessSlug,
+        serviceId: selectedService.id,
+        clientName: formData.fullName,
+        clientEmail: formData.emailAddress,
+        clientPhone: formData.mobileNumber,
+        clientAddress: formData.address,
+        bookingDate: selectedDate.toISOString().split('T')[0],
+        bookingTime: selectedSlot?.time || selectedTime,
+        notes: formData.message
+      };
+
+      console.log('📤 Submitting booking:', bookingData);
+
+      const response = await bookingsAPI.create(bookingData);
+
+      console.log('✅ Booking created:', response.data);
+
+      // Navigate to confirmation with booking details
+      navigate(`/${businessSlug}/confirmation`, { 
+        state: { 
+          selectedService: selectedService,
+          booking: response.data.booking,
+          bookingDetails: { 
+            date: selectedDate.toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            }),
+            time: selectedTime,
+            ...formData
+          },
+          hasChatHistory: response.data.hasChatHistory,
+          chatMessageCount: response.data.chatMessageCount
         }
-      }
-    });
+      });
+
+    } catch (err: any) {
+      console.error('❌ Booking error:', err);
+      setError(err.response?.data?.message || 'Failed to create booking');
+      setLoading(false);
+    }
   };
 
   const handleBackClick = () => {
@@ -259,6 +240,16 @@ export default function BookingPage() {
     return days;
   };
 
+  // Convert 24hr to 12hr format for display
+  const formatTime = (time: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
   if (!selectedService) {
     return <Navigate to={`/${businessSlug}/services`} replace />;
   }
@@ -266,20 +257,33 @@ export default function BookingPage() {
   if (loading) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">Loading...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-primaryGreen border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-500">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  const minAdvanceDays = getMinAdvanceDays();
   const showAdvanceNotice = minAdvanceDays > 0;
 
   return (
     <div>
       {/* Error Message */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2">
+          <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+          <div>
+            {error}
+            <button 
+              onClick={() => setError('')}
+              className="ml-2 underline hover:no-underline"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
@@ -428,6 +432,11 @@ export default function BookingPage() {
                 </div>
                 <p className="text-gray-500 text-sm">Select a date to see available times</p>
               </div>
+            ) : loadingSlots ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-12 h-12 border-4 border-primaryGreen border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-500 text-sm">Checking availability...</p>
+              </div>
             ) : availableTimeSlots.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
@@ -440,20 +449,20 @@ export default function BookingPage() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-2">
-                {availableTimeSlots.map((time, index) => (
+                {availableTimeSlots.map((slot, index) => (
                   <button
                     key={index}
-                    onClick={() => setSelectedTime(time)}
+                    onClick={() => setSelectedTime(slot.display)}
                     className={`
                       py-3 px-4 rounded-lg border-2 font-medium text-sm
                       transition-all duration-200
-                      ${selectedTime === time
+                      ${selectedTime === slot.display
                         ? "bg-primaryGreen text-white border-primaryGreen shadow-md scale-105"
                         : "border-gray-200 text-gray-700 hover:border-primaryGreen hover:bg-green-50 hover:scale-105"
                       }
                     `}
                   >
-                    {time}
+                    {slot.display}
                   </button>
                 ))}
               </div>
@@ -557,10 +566,17 @@ export default function BookingPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={!selectedDate || !selectedTime || !agreeToPolicy || !formData.fullName || !formData.emailAddress || !formData.mobileNumber}
-            className="btn-primary w-full md:w-auto px-12 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            disabled={!selectedDate || !selectedTime || !agreeToPolicy || !formData.fullName || !formData.emailAddress || !formData.mobileNumber || loading}
+            className="btn-primary w-full md:w-auto px-12 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
           >
-            Confirm Booking
+            {loading ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Processing...
+              </>
+            ) : (
+              'Confirm Booking'
+            )}
           </button>
         </div>
       </div>

@@ -61,7 +61,10 @@ export const businessAPI = {
     });
   },
   // Booking Policy
-  updateBookingPolicy: (data) => api.put('/business/booking-policy', data)
+  updateBookingPolicy: (data) => api.put('/business/booking-policy', data),
+  // Google Calendar
+  connectGoogleCalendar: () => api.get('/business/google-calendar/connect'),
+  disconnectGoogleCalendar: () => api.delete('/business/google-calendar/disconnect')
 };
 
 // ==================== SERVICES API ====================
@@ -99,12 +102,32 @@ export const galleryAPI = {
 // ==================== BOOKINGS API ====================
 
 export const bookingsAPI = {
+  // Create a new booking (client)
   create: (data) => api.post('/bookings', data),
+  
+  // Get business bookings (authenticated)
   getMyBookings: (params) => api.get('/bookings/my-bookings', { params }),
+  
+  // Get booking by ID (authenticated)
   getById: (id) => api.get(`/bookings/${id}`),
+  
+  // Update booking status (authenticated)
   updateStatus: (id, status) => api.put(`/bookings/${id}/status`, { status }),
-  getAvailableSlots: (businessSlug, date) => 
-    api.get(`/bookings/available-slots/${businessSlug}/${date}`)
+  
+  // Get available time slots for a date
+  getAvailableSlots: (businessSlug, date, params) => 
+    api.get(`/bookings/available-slots/${businessSlug}/${date}`, { params }),
+  
+  // Check if a specific slot is available
+  checkAvailability: (data) => api.post('/bookings/check-availability', data),
+  
+  // Cancel booking (client)
+  cancelBooking: (id, clientEmail) => 
+    api.put(`/bookings/${id}/cancel`, { clientEmail }),
+  
+  // Get client bookings
+  getClientBookings: (clientEmail, params) => 
+    api.get(`/bookings/client/${clientEmail}`, { params })
 };
 
 // ==================== CHAT API ====================

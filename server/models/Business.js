@@ -86,6 +86,16 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       defaultValue: null
     },
+    // Google Calendar Integration
+    googleCalendarTokens: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Stored as JSON string with access_token and refresh_token'
+    },
+    googleCalendarConnected: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
