@@ -28,6 +28,18 @@ module.exports = (sequelize, DataTypes) => {
     enabled: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
+    },
+    hasRest: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    restStartTime: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    restEndTime: {
+      type: DataTypes.STRING,
+      allowNull: true
     }
   }, {
     timestamps: true

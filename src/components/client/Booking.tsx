@@ -542,7 +542,7 @@ export default function BookingPage() {
         </div>
 
         <div className="flex flex-col items-center gap-4">
-          <div className="flex items-start gap-3 w-full max-w-md">
+          <div className="flex items-center gap-3 w-full max-w-md">
             <input
               type="checkbox"
               id="policy"

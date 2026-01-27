@@ -81,6 +81,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.JSON, 
       defaultValue: []
     },
+    bufferTime: {
+      type: DataTypes.STRING, 
+      allowNull: true,
+      defaultValue: null
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true

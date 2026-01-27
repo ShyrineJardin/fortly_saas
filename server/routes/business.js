@@ -122,7 +122,8 @@ router.put('/profile', authMiddleware, upload.fields([
       twitter,
       instagram,
       linkedin,
-      businessHours
+      businessHours,
+      bufferTime
     } = req.body;
     
     const updateData = {
@@ -136,7 +137,9 @@ router.put('/profile', authMiddleware, upload.fields([
       facebook,
       twitter,
       instagram,
-      linkedin
+      linkedin,
+      // Handle optional buffer time - set to null if empty string
+      bufferTime: bufferTime !== undefined ? (bufferTime || null) : undefined
     };
 
     if (req.files?.logo) {
@@ -157,7 +160,7 @@ router.put('/profile', authMiddleware, upload.fields([
         where: { businessId: req.business.id }
       });
 
-      // Create new schedules
+      // Create new schedules with rest time support
       const schedulePromises = hours
         .filter(hour => hour.enabled && hour.startTime && hour.endTime)
         .map(hour => 
@@ -166,7 +169,10 @@ router.put('/profile', authMiddleware, upload.fields([
             dayOfWeek: hour.day,
             startTime: hour.startTime,
             endTime: hour.endTime,
-            enabled: hour.enabled
+            enabled: hour.enabled,
+            hasRest: hour.hasRest || false,
+            restStartTime: hour.restStartTime || null,
+            restEndTime: hour.restEndTime || null
           })
         );
 

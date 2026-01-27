@@ -54,7 +54,10 @@ export default function ClientSidebar() {
 
   const activeBusinessHours = businessData?.schedules?.filter((item: any) => 
     item.enabled && item.startTime && item.endTime
-  ) || [];
+  ).sort((a: any, b: any) => {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    return dayOrder.indexOf(a.dayOfWeek) - dayOrder.indexOf(b.dayOfWeek);
+  }) || [];
 
   if (loading) {
     return (

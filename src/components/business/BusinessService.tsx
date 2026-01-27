@@ -9,6 +9,8 @@ interface Service {
   id: string;
   name: string;
   duration: string;
+  durationValue?: string;  
+  durationUnit?: string;   
   price: string;
   description: string;
   image?: string;
@@ -25,6 +27,9 @@ interface BusinessHour {
   startTime: string;
   endTime: string;
   enabled: boolean;
+  restStartTime?: string;
+  restEndTime?: string;
+  hasRest?: boolean;
 }
 
 export default function BusinessService() {
@@ -37,6 +42,11 @@ export default function BusinessService() {
   const [bulkStartTime, setBulkStartTime] = useState('09:00');
   const [bulkEndTime, setBulkEndTime] = useState('17:00');
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  
+  // Bulk rest time
+  const [bulkRestStartTime, setBulkRestStartTime] = useState('12:00');
+  const [bulkRestEndTime, setBulkRestEndTime] = useState('13:00');
+  const [applyBulkRest, setApplyBulkRest] = useState(false);
 
   const dayGroups = {
     'weekdays': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
@@ -75,7 +85,10 @@ export default function BusinessService() {
           ...newSchedule[index],
           startTime: bulkStartTime,
           endTime: bulkEndTime,
-          enabled: true
+          enabled: true,
+          hasRest: applyBulkRest,
+          restStartTime: applyBulkRest ? bulkRestStartTime : '',
+          restEndTime: applyBulkRest ? bulkRestEndTime : ''
         };
       }
     });
@@ -90,7 +103,10 @@ export default function BusinessService() {
         ...day,
         startTime: '',
         endTime: '',
-        enabled: false
+        enabled: false,
+        hasRest: false,
+        restStartTime: '',
+        restEndTime: ''
       })));
     }
   };
@@ -108,24 +124,27 @@ export default function BusinessService() {
     id: '',
     name: "",
     duration: "",
+    durationValue: "",    
+    durationUnit: "minutes",  
     price: "",
     description: "",
     image: ""
   });
   
   const [currency, setCurrency] = useState("PHP");
-  const [bufferTimeValue, setBufferTimeValue] = useState("15");
+  const [bufferTimeValue, setBufferTimeValue] = useState("");
   const [bufferTimeUnit, setBufferTimeUnit] = useState("minutes");
+  const [enableBufferTime, setEnableBufferTime] = useState(false);
 
   // Synced weekly schedule from business hours
   const [weeklySchedule, setWeeklySchedule] = useState<BusinessHour[]>([
-    { day: "Monday", startTime: '', endTime: '', enabled: false },
-    { day: "Tuesday", startTime: '', endTime: '', enabled: false },
-    { day: "Wednesday", startTime: '', endTime: '', enabled: false },
-    { day: "Thursday", startTime: '', endTime: '', enabled: false },
-    { day: "Friday", startTime: '', endTime: '', enabled: false },
-    { day: "Saturday", startTime: '', endTime: '', enabled: false },
-    { day: "Sunday", startTime: '', endTime: '', enabled: false }
+    { day: "Monday", startTime: '', endTime: '', enabled: false, hasRest: false, restStartTime: '', restEndTime: '' },
+    { day: "Tuesday", startTime: '', endTime: '', enabled: false, hasRest: false, restStartTime: '', restEndTime: '' },
+    { day: "Wednesday", startTime: '', endTime: '', enabled: false, hasRest: false, restStartTime: '', restEndTime: '' },
+    { day: "Thursday", startTime: '', endTime: '', enabled: false, hasRest: false, restStartTime: '', restEndTime: '' },
+    { day: "Friday", startTime: '', endTime: '', enabled: false, hasRest: false, restStartTime: '', restEndTime: '' },
+    { day: "Saturday", startTime: '', endTime: '', enabled: false, hasRest: false, restStartTime: '', restEndTime: '' },
+    { day: "Sunday", startTime: '', endTime: '', enabled: false, hasRest: false, restStartTime: '', restEndTime: '' }
   ]);
 
   // Buffer time units
@@ -163,7 +182,10 @@ export default function BusinessService() {
           day,
           startTime: schedule?.startTime || '',
           endTime: schedule?.endTime || '',
-          enabled: schedule?.enabled || false
+          enabled: schedule?.enabled || false,
+          hasRest: schedule?.hasRest || false,
+          restStartTime: schedule?.restStartTime || '',
+          restEndTime: schedule?.restEndTime || ''
         };
       });
       
@@ -171,11 +193,15 @@ export default function BusinessService() {
 
       // Load buffer time if stored (e.g., "15 minutes" → value: 15, unit: minutes)
       if (business.bufferTime) {
+        setEnableBufferTime(true);
         const match = business.bufferTime.match(/^(\d+(?:\.\d+)?)\s*(\w+)$/);
         if (match) {
           setBufferTimeValue(match[1]);
           setBufferTimeUnit(match[2]);
         }
+      } else {
+        setEnableBufferTime(false);
+        setBufferTimeValue("");
       }
 
       // Load services
@@ -237,6 +263,8 @@ export default function BusinessService() {
       id: '',
       name: "",
       duration: "",
+      durationValue: "",
+      durationUnit: "minutes",
       price: "",
       description: "",
       image: ""
@@ -246,7 +274,24 @@ export default function BusinessService() {
 
   const handleEditService = (service: Service) => {
     setEditingService(service);
-    setServiceForm(service);
+    
+    // Parse duration string (e.g., "60 minutes" -> value: 60, unit: minutes)
+    let durationValue = '';
+    let durationUnit = 'minutes';
+    
+    if (service.duration) {
+      const match = service.duration.match(/^(\d+(?:\.\d+)?)\s*(\w+)$/);
+      if (match) {
+        durationValue = match[1];
+        durationUnit = match[2];
+      }
+    }
+    
+    setServiceForm({
+      ...service,
+      durationValue,
+      durationUnit
+    });
     setShowServiceModal(true);
   };
 
@@ -263,6 +308,12 @@ export default function BusinessService() {
 
   const handleServiceSave = async () => {
     try {
+      // Validate duration
+      if (!serviceForm.durationValue || parseFloat(serviceForm.durationValue) <= 0) {
+        setError('Please enter a valid duration');
+        return;
+      }
+
       const formData = new FormData();
       formData.append('name', serviceForm.name);
       formData.append('description', serviceForm.description);
@@ -297,10 +348,25 @@ export default function BusinessService() {
   const toggleScheduleDay = (index: number) => {
     const newSchedule = [...weeklySchedule];
     newSchedule[index].enabled = !newSchedule[index].enabled;
+    if (!newSchedule[index].enabled) {
+      newSchedule[index].hasRest = false;
+      newSchedule[index].restStartTime = '';
+      newSchedule[index].restEndTime = '';
+    }
     setWeeklySchedule(newSchedule);
   };
 
-  const updateScheduleTime = (index: number, field: 'startTime' | 'endTime', value: string) => {
+  const toggleRestTime = (index: number) => {
+    const newSchedule = [...weeklySchedule];
+    newSchedule[index].hasRest = !newSchedule[index].hasRest;
+    if (!newSchedule[index].hasRest) {
+      newSchedule[index].restStartTime = '';
+      newSchedule[index].restEndTime = '';
+    }
+    setWeeklySchedule(newSchedule);
+  };
+
+  const updateScheduleTime = (index: number, field: 'startTime' | 'endTime' | 'restStartTime' | 'restEndTime', value: string) => {
     const newSchedule = [...weeklySchedule];
     newSchedule[index][field] = value;
     setWeeklySchedule(newSchedule);
@@ -311,9 +377,9 @@ export default function BusinessService() {
     try {
       setLoading(true);
       
-      // Validate buffer time value
-      if (!bufferTimeValue || parseFloat(bufferTimeValue) <= 0) {
-        setError('Please enter a valid buffer time value');
+      // Validate buffer time value if enabled
+      if (enableBufferTime && (!bufferTimeValue || parseFloat(bufferTimeValue) <= 0)) {
+        setError('Please enter a valid buffer time value or disable buffer time');
         setLoading(false);
         return;
       }
@@ -321,7 +387,13 @@ export default function BusinessService() {
       // Update business hours - this will sync with BusinessSidebar
       const data = new FormData();
       data.append('businessHours', JSON.stringify(weeklySchedule));
-      data.append('bufferTime', `${bufferTimeValue} ${bufferTimeUnit}`);
+      
+      // Only append buffer time if enabled
+      if (enableBufferTime) {
+        data.append('bufferTime', `${bufferTimeValue} ${bufferTimeUnit}`);
+      } else {
+        data.append('bufferTime', ''); // Clear buffer time
+      }
       
       await businessAPI.updateProfile(data);
       
@@ -373,8 +445,8 @@ export default function BusinessService() {
         </button>
         
         <h2 className="lg:text-base text-sm font-semibold">{bookingPolicy.title}</h2>
-        <div className="text-gray-700 text-sm">
-          <p className="text-policyBodyText lg:text-sm text-xs">{bookingPolicy.description}</p>
+        <div className="text-policyBodyText lg:text-sm text-xs">
+          <p>{bookingPolicy.description}</p>
           {bookingPolicy.policyList.length > 0 && (
             <ol className="list-decimal list-inside space-y-1 mt-2">
               {bookingPolicy.policyList.map((item, index) => (
@@ -412,12 +484,12 @@ export default function BusinessService() {
                       className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0 object-cover" 
                     />
                   ) : (
-                    <div className="w-16 h-16 bg-gray-200 rounded-lg flex-shrink-0" />
+                    <div className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0" />
                   )}
                   <div className="flex-1">
                     <h3 className="lg:text-base text-sm font-semibold">{service.name}</h3>
                     <p className="lg:text-sm text-xs text-gray-500">{service.duration} · {service.price}</p>
-                    <p className="lg:text-sm text-xs flex items-center gap-1 lg:mt-1 hover:underline text-gray-600">{service.description}</p>
+                    <p className="lg:text-sm text-xs flex items-center gap-1 mt-3 text-gray-600">{service.description}</p>
                   </div>
                 </div>
                 
@@ -443,94 +515,390 @@ export default function BusinessService() {
 
       {/* Set Weekly Schedule Section - SYNCED WITH BUSINESS HOURS */}
       <div className="bg-white border border-border rounded-2xl p-6 shadow-sm mb-4">
-        <h2 className="lg:text-base text-sm font-semibold">Set your weekly schedule</h2>
-        <p className="lg:text-sm text-xs text-gray-600 mb-4">
-          Manage your timeslots to accept bookings only during the marked hours
-        </p>
-        <p className="lg:text-xs text-xs text-emerald-600 mb-6 font-medium">
-          ✓ Synced with Business Hours from your profile
-        </p>
-        
-        <div className="space-y-3">
-          {weeklySchedule.map((day, index) => (
-            <div key={day.day} className="flex items-center gap-4">
+        <div className="mb-6">
+          <h2 className="lg:text-lg text-base font-semibold mb-2">Weekly Schedule</h2>
+          <p className="lg:text-sm text-xs text-textSecondaryColor">
+            Set your availability for accepting bookings
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="w-2 h-2 bg-primaryGreen rounded-full animate-pulse"></div>
+            <p className="lg:text-xs text-xs text-primaryGreen font-medium">
+              Synced with your business profile
+            </p>
+          </div>
+        </div>
+
+        {/* Bulk Edit Section - Improved */}
+        <div className="bg-softGreen border border-policyOutline p-5 rounded-xl mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-2 bg-primaryGreen rounded-lg">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-semibold text-textPrimaryColor">Quick Bulk Setup</h3>
+          </div>
+          
+          {/* Step 1: Select Days */}
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-policyBodyText mb-2 uppercase tracking-wide">
+              Step 1: Select Days
+            </label>
+            
+            {/* Quick Select Buttons */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              <button
+                onClick={() => selectDayGroup('weekdays')}
+                className="px-3 py-1.5 text-xs font-medium border-2 border-primaryGreen text-primaryGreen bg-white rounded-lg hover:bg-softGreen transition-colors"
+              >
+                📅 Weekdays (M-F)
+              </button>
+              <button
+                onClick={() => selectDayGroup('weekend')}
+                className="px-3 py-1.5 text-xs font-medium border-2 border-primaryGreen text-primaryGreen bg-white rounded-lg hover:bg-softGreen transition-colors"
+              >
+                🌴 Weekend (S-S)
+              </button>
+              <button
+                onClick={() => selectDayGroup('all')}
+                className="px-3 py-1.5 text-xs font-medium border-2 border-primaryGreen text-primaryGreen bg-white rounded-lg hover:bg-softGreen transition-colors"
+              >
+                🌍 All Days
+              </button>
+            </div>
+
+            {/* Individual Day Selection - Improved */}
+            <div className="grid grid-cols-7 gap-2">
+              {weeklySchedule.map((day) => (
+                <label 
+                  key={day.day} 
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 cursor-pointer transition-all ${
+                    selectedDays.includes(day.day)
+                      ? 'bg-primaryGreen border-hoverGreen text-white shadow-md scale-105'
+                      : 'bg-white border-border text-textSecondaryColor hover:border-primaryGreen hover:shadow-sm'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedDays.includes(day.day)}
+                    onChange={() => toggleDaySelection(day.day)}
+                    className="hidden"
+                  />
+                  <span className="text-xs font-bold">{day.day.slice(0, 3)}</span>
+                  {selectedDays.includes(day.day) && (
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </label>
+              ))}
+            </div>
+            {selectedDays.length > 0 && (
+              <p className="text-xs text-primaryGreen font-medium mt-2">
+                ✓ {selectedDays.length} day{selectedDays.length > 1 ? 's' : ''} selected
+              </p>
+            )}
+          </div>
+
+          {/* Step 2: Set Hours */}
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-policyBodyText mb-2 uppercase tracking-wide">
+              Step 2: Set Working Hours
+            </label>
+            <div className="grid grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-border">
+              <div>
+                <label className="block text-xs font-medium text-textSecondaryColor mb-1">🌅 Start Time</label>
+                <input
+                  type="time"
+                  value={bulkStartTime}
+                  onChange={(e) => setBulkStartTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
+                />
+                <p className="text-xs text-textSecondaryColor mt-1">{formatTime(bulkStartTime)}</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-textSecondaryColor mb-1">🌆 End Time</label>
+                <input
+                  type="time"
+                  value={bulkEndTime}
+                  onChange={(e) => setBulkEndTime(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
+                />
+                <p className="text-xs text-textSecondaryColor mt-1">{formatTime(bulkEndTime)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3: Rest Time (Optional) */}
+          <div className="mb-4">
+            <label className="flex items-center gap-2 mb-2 cursor-pointer group">
               <input
                 type="checkbox"
-                checked={day.enabled}
-                onChange={() => toggleScheduleDay(index)}
-                className="w-5 h-5"
+                checked={applyBulkRest}
+                onChange={(e) => setApplyBulkRest(e.target.checked)}
+                className="w-4 h-4 text-primaryGreen rounded focus:ring-2 focus:ring-primaryGreen"
               />
-              <span className="w-28 text-sm font-medium">{day.day}</span>
-              {day.enabled ? (
-                <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-policyBodyText uppercase tracking-wide group-hover:text-primaryGreen transition-colors">
+                Step 3: Add Rest Time (Optional)
+              </span>
+            </label>
+            
+            {applyBulkRest && (
+              <div className="grid grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-border ml-6">
+                <div>
+                  <label className="block text-xs font-medium text-textSecondaryColor mb-1">☕ Rest Start</label>
                   <input
                     type="time"
-                    value={day.startTime}
-                    onChange={(e) => updateScheduleTime(index, 'startTime', e.target.value)}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm"
+                    value={bulkRestStartTime}
+                    onChange={(e) => setBulkRestStartTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
                   />
-                  <span className="text-sm text-gray-500">-</span>
-                  <input
-                    type="time"
-                    value={day.endTime}
-                    onChange={(e) => updateScheduleTime(index, 'endTime', e.target.value)}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm"
-                  />
-                  <span className="text-xs text-gray-500 ml-2">
-                    ({formatTime(day.startTime)} - {formatTime(day.endTime)})
-                  </span>
+                  <p className="text-xs text-textSecondaryColor mt-1">{formatTime(bulkRestStartTime)}</p>
                 </div>
-              ) : (
-                <button
-                  onClick={() => toggleScheduleDay(index)}
-                  className="text-sm text-emerald-600 hover:underline"
-                >
-                  + Add hours
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Buffer Time - Input + Dropdown */}
-        <div className="mt-6">
-          <h3 className="text-sm font-semibold">Buffer Time</h3>
-          <p className="lg:text-sm text-xs text-gray-600 mb-3">
-            How long before the slot opens to give a cushion
-          </p>
-          <div className="flex gap-2 max-w-xs">
-            <input
-              type="number"
-              min="1"
-              step="0.5"
-              value={bufferTimeValue}
-              onChange={(e) => setBufferTimeValue(e.target.value)}
-              placeholder="15"
-              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
-            <select
-              value={bufferTimeUnit}
-              onChange={(e) => setBufferTimeUnit(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            >
-              {bufferTimeUnits.map(unit => (
-                <option key={unit.value} value={unit.value}>
-                  {unit.label}
-                </option>
-              ))}
-            </select>
+                <div>
+                  <label className="block text-xs font-medium text-textSecondaryColor mb-1">⏰ Rest End</label>
+                  <input
+                    type="time"
+                    value={bulkRestEndTime}
+                    onChange={(e) => setBulkRestEndTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
+                  />
+                  <p className="text-xs text-textSecondaryColor mt-1">{formatTime(bulkRestEndTime)}</p>
+                </div>
+              </div>
+            )}
           </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Current: {bufferTimeValue} {bufferTimeUnit}
-          </p>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-3 border-t border-policyOutline">
+            <button
+              onClick={applyBulkHours}
+              className="btn-primary flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Apply Changes
+            </button>
+            <button
+              onClick={clearAllHours}
+              className="px-4 py-2.5 bg-white text-red-600 border-2 border-red-200 rounded-full font-poppins font-semibold lg:text-sm text-xs hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear All
+            </button>
+          </div>
         </div>
 
+        {/* Individual Day Schedule - Improved */}
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-textPrimaryColor mb-3 flex items-center gap-2">
+            <svg className="w-4 h-4 text-primaryGreen" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Individual Day Settings
+          </h3>
+          
+          <div className="space-y-3">
+            {weeklySchedule.map((day, index) => (
+              <div 
+                key={day.day} 
+                className={`border-2 rounded-xl p-4 transition-all ${
+                  day.enabled 
+                    ? 'border-policyOutline bg-softGreen shadow-sm' 
+                    : 'border-border bg-backgroundColor hover:border-policyOutline'
+                }`}
+              >
+                {/* Day Header */}
+                <div className="flex items-center gap-3 mb-3">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={day.enabled}
+                      onChange={() => toggleScheduleDay(index)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-border peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-softGreen rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primaryGreen"></div>
+                  </label>
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold ${day.enabled ? 'text-primaryGreen' : 'text-textSecondaryColor'}`}>
+                        {day.day}
+                      </span>
+                      {day.enabled && (
+                        <span className="px-2 py-0.5 bg-softGreen text-primaryGreen text-xs font-medium rounded-full border border-policyOutline">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    {!day.enabled && (
+                      <p className="text-xs text-textSecondaryColor mt-0.5">Closed on this day</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Time Settings - Only show when enabled */}
+                {day.enabled && (
+                  <div className="ml-3 md:ml-14 space-y-3">
+                    {/* Working Hours */}
+                    <div className="bg-white p-3 rounded-lg border border-border">
+                      <label className="block text-xs font-semibold text-textSecondaryColor mb-2">Working Hours</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="time"
+                          value={day.startTime}
+                          onChange={(e) => updateScheduleTime(index, 'startTime', e.target.value)}
+                          className="flex-1 px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
+                        />
+                        <input
+                          type="time"
+                          value={day.endTime}
+                          onChange={(e) => updateScheduleTime(index, 'endTime', e.target.value)}
+                          className="flex-1 px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
+                        />
+                      </div>
+                      <p className="text-xs text-textSecondaryColor mt-2 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {formatTime(day.startTime)} - {formatTime(day.endTime)}
+                      </p>
+                    </div>
+
+                    {/* Rest Time Toggle */}
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={day.hasRest || false}
+                        onChange={() => toggleRestTime(index)}
+                        className="w-4 h-4 text-primaryGreen rounded focus:ring-2 focus:ring-primaryGreen"
+                      />
+                      <span className="text-xs font-semibold text-textSecondaryColor group-hover:text-primaryGreen transition-colors">
+                        ☕ Add Rest/Break Time
+                      </span>
+                    </label>
+                    
+                    {/* Rest Time Settings */}
+                    {day.hasRest && (
+                      <div className="bg-policyBackground p-3 rounded-lg border border-policyOutline">
+                        <label className="block text-xs font-semibold text-policyBodyText mb-2">Rest Time</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={day.restStartTime || ''}
+                            onChange={(e) => updateScheduleTime(index, 'restStartTime', e.target.value)}
+                            className="flex-1 px-3 py-2 border border-policyOutline rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent bg-white"
+                          />
+                          <input
+                            type="time"
+                            value={day.restEndTime || ''}
+                            onChange={(e) => updateScheduleTime(index, 'restEndTime', e.target.value)}
+                            className="flex-1 px-3 py-2 border border-policyOutline rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent bg-white"
+                          />
+                        </div>
+                        <p className="text-xs text-policyBodyText mt-2 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Break: {formatTime(day.restStartTime || '')} - {formatTime(day.restEndTime || '')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Buffer Time - Optional - Improved */}
+        <div className="border-t-2 border-border pt-6 ">
+          <div className="bg-softGreen border-2 border-policyOutline rounded-xl p-4">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={enableBufferTime}
+                onChange={(e) => setEnableBufferTime(e.target.checked)}
+                className="w-5 h-5 text-primaryGreen rounded focus:ring-2 focus:ring-primaryGreen mt-0.5"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <svg className="w-4 h-4 text-primaryGreen" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-sm font-semibold text-textPrimaryColor group-hover:text-primaryGreen transition-colors">
+                    Buffer Time (Optional)
+                  </h3>
+                </div>
+                <p className="text-xs text-textSecondaryColor">
+                  Add a cushion period before appointments to prepare
+                </p>
+              </div>
+            </label>
+            
+            {enableBufferTime && (
+              <div className="mt-4 ml-8">
+                <div className="bg-white p-3 rounded-lg border border-policyOutline">
+                  <label className="block text-xs font-semibold text-textSecondaryColor mb-2">Buffer Duration</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={bufferTimeValue}
+                      onChange={(e) => setBufferTimeValue(e.target.value)}
+                      placeholder="15"
+                      className="w-20 px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
+                    />
+                    <select
+                      value={bufferTimeUnit}
+                      onChange={(e) => setBufferTimeUnit(e.target.value)}
+                      className="w-1/2 md:w-32 px-3 py-2 border border-border rounded-lg text-sm font-medium focus:ring-2 focus:ring-primaryGreen focus:border-transparent"
+                    >
+                      {bufferTimeUnits.map(unit => (
+                        <option key={unit.value} value={unit.value}>
+                          {unit.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-primaryGreen font-medium mt-2 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Current: {bufferTimeValue} {bufferTimeUnit}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Save Button - Prominent */}
         <button 
           onClick={handleSaveSchedule}
           disabled={loading}
-          className="mt-6 btn-primary w-1/4 disabled:opacity-50"
+          className="mt-6 btn-primary w-full flex items-center justify-center gap-3 py-3"
         >
-          {loading ? 'Saving...' : 'Save Schedule'}
+          {loading ? (
+            <>
+              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Saving Changes...
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Save Schedule & Settings
+            </>
+          )}
         </button>
       </div>
 
@@ -539,7 +907,7 @@ export default function BusinessService() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">Booking Policy *</h3>
+              <h3 className="text-xl font-semibold">Booking Policy</h3>
               <button onClick={() => setShowPolicyModal(false)}>
                 {IoClose({ size: 24 })}
               </button>
@@ -676,16 +1044,37 @@ export default function BusinessService() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Duration</label>
-                  <input
-                    type="text"
-                    value={serviceForm.duration}
-                    onChange={(e) => setServiceForm({ ...serviceForm, duration: e.target.value })}
-                    placeholder="e.g., 60 mins"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
+                  <label className="block text-sm font-medium mb-2">Duration/Preparation Time</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={serviceForm.durationValue || ''}
+                      onChange={(e) => setServiceForm({ 
+                        ...serviceForm, 
+                        durationValue: e.target.value,
+                        duration: `${e.target.value} ${serviceForm.durationUnit || 'minutes'}`
+                      })}
+                      placeholder="60"
+                      className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                    <select
+                      value={serviceForm.durationUnit || 'minutes'}
+                      onChange={(e) => setServiceForm({ 
+                        ...serviceForm, 
+                        durationUnit: e.target.value,
+                        duration: `${serviceForm.durationValue || ''} ${e.target.value}`
+                      })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="minutes">Minutes</option>
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
