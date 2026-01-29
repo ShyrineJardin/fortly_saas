@@ -223,6 +223,146 @@ class AvailabilityService {
   }
 
   /**
+   * Get available slots with status (available vs taken)
+   * Shows both available and unavailable time slots with reasons
+   */
+  async getAvailableSlotsWithStatus(business, service, date, existingBookings) {
+    try {
+      const timezone = business.timezone || 'UTC';
+      const requestedDate = moment.tz(date, timezone);
+      const dayOfWeek = requestedDate.format('dddd');
+      
+      console.log('🔍 Checking slots with status:', {
+        date: requestedDate.format('YYYY-MM-DD'),
+        dayOfWeek,
+        timezone
+      });
+      
+      // Get schedule for this day
+      const schedule = business.schedules?.find(s => s.dayOfWeek === dayOfWeek);
+      
+      if (!schedule || !schedule.enabled) {
+        console.log('❌ Business closed on', dayOfWeek);
+        return { availableSlots: [], takenSlots: [], closedDay: true };
+      }
+
+      console.log('✅ Business open:', {
+        hours: `${schedule.startTime} - ${schedule.endTime}`,
+        hasRest: schedule.hasRest
+      });
+
+      // Parse service duration
+      const serviceDuration = this.parseDuration(service.duration);
+      
+      // Parse buffer time
+      const bufferMinutes = business.bufferTime ? this.parseDuration(business.bufferTime) : 0;
+
+      console.log('⏱️ Duration settings:', {
+        service: `${serviceDuration} min`,
+        buffer: `${bufferMinutes} min`
+      });
+
+      // Generate all possible time slots
+      const allSlots = [];
+      const takenSlots = [];
+      const slotInterval = 30; // 30-minute intervals
+      
+      let currentTime = moment.tz(`${date} ${schedule.startTime}`, 'YYYY-MM-DD HH:mm', timezone);
+      const endTime = moment.tz(`${date} ${schedule.endTime}`, 'YYYY-MM-DD HH:mm', timezone);
+      
+      // Rest time boundaries
+      let restStart, restEnd;
+      if (schedule.hasRest && schedule.restStartTime && schedule.restEndTime) {
+        restStart = moment.tz(`${date} ${schedule.restStartTime}`, 'YYYY-MM-DD HH:mm', timezone);
+        restEnd = moment.tz(`${date} ${schedule.restEndTime}`, 'YYYY-MM-DD HH:mm', timezone);
+      }
+
+      while (currentTime.clone().add(serviceDuration, 'minutes').isSameOrBefore(endTime)) {
+        const slotEnd = currentTime.clone().add(serviceDuration, 'minutes');
+        
+        // Skip if in rest period
+        if (restStart && restEnd) {
+          if (currentTime.isBetween(restStart, restEnd, null, '[)') || 
+              slotEnd.isAfter(restStart) && currentTime.isBefore(restEnd)) {
+            currentTime.add(slotInterval, 'minutes');
+            continue;
+          }
+        }
+
+        // Check if slot is taken by existing bookings
+        let isTaken = false;
+        let bookingInfo = null;
+        
+        for (const booking of existingBookings) {
+          const bookingStart = moment.tz(
+            `${booking.bookingDate} ${booking.bookingTime}`,
+            'YYYY-MM-DD HH:mm',
+            timezone
+          );
+          
+          const bookingDuration = this.parseDuration(booking.Service.duration);
+          const bookingEnd = bookingStart.clone().add(bookingDuration, 'minutes');
+          
+          // Check for overlap
+          if (currentTime.isBetween(bookingStart, bookingEnd, null, '[)') ||
+              slotEnd.isAfter(bookingStart) && currentTime.isBefore(bookingEnd)) {
+            isTaken = true;
+            bookingInfo = booking;
+            break;
+          }
+        }
+
+        if (isTaken) {
+          // Add to taken slots
+          takenSlots.push({
+            time: currentTime.format('HH:mm'),
+            display: this.formatTime(currentTime.format('HH:mm')), // ✅ Use formatTime instead
+            reason: `Booked: ${bookingInfo.clientName}`,
+            status: bookingInfo.status
+          });
+        } else {
+          // Check if slot is in the past (including buffer time)
+          const now = moment.tz(timezone);
+          const minBookingTime = now.clone().add(bufferMinutes, 'minutes');
+          
+          if (currentTime.isAfter(minBookingTime)) {
+            allSlots.push({
+              time: currentTime.format('HH:mm'),
+              display: this.formatTime(currentTime.format('HH:mm')), // ✅ Use formatTime instead
+              available: true
+            });
+          } else {
+            takenSlots.push({
+              time: currentTime.format('HH:mm'),
+              display: this.formatTime(currentTime.format('HH:mm')), // ✅ Use formatTime instead
+              reason: 'Past time / Within buffer period',
+              status: 'unavailable'
+            });
+          }
+        }
+
+        currentTime.add(slotInterval, 'minutes');
+      }
+
+      console.log('📊 Slot results:', {
+        available: allSlots.length,
+        taken: takenSlots.length,
+        total: allSlots.length + takenSlots.length
+      });
+
+      return {
+        availableSlots: allSlots,
+        takenSlots: takenSlots,
+        closedDay: false
+      };
+
+    } catch (error) {
+      console.error('❌ Get available slots with status error:', error);
+      return { availableSlots: [], takenSlots: [], closedDay: false };
+    }
+  }
+
+  /**
    * Convert time string to minutes
    */
   timeToMinutes(timeString) {

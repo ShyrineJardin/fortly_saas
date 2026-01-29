@@ -10,269 +10,280 @@ const transporter = nodemailer.createTransport({
 
 let emailCount = 0;
 
-// ==================== BOOKING EMAILS ====================
-
 /**
- * Send booking confirmation email to client
+ * Email Service Class
+ * Handles booking confirmation and notification emails
  */
-const sendBookingConfirmation = async (booking, business, service) => {
-  emailCount++;
-  console.log(`📧 Booking confirmation email (${emailCount} today)`);
-  
-  if (emailCount > 450) {
-    console.warn('⚠️ Approaching daily email limit!');
+class EmailService {
+  constructor(transporter) {
+    this.transporter = transporter;
   }
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: booking.clientEmail,
-    subject: `Booking Confirmed - ${service.name} at ${business.businessName}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: #4CAF84; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-          .content { background-color: #f9f9f9; padding: 20px; border-radius: 0 0 5px 5px; }
-          .booking-details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 5px; border: 1px solid #ddd; }
-          .detail-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
-          .detail-label { font-weight: bold; color: #555; }
-          .detail-value { color: #333; }
-          .button { display: inline-block; background-color: #4CAF84; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #999; }
-          .status-badge { display: inline-block; padding: 5px 15px; background-color: #FFA726; color: white; border-radius: 15px; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h2>✅ Booking Confirmed!</h2>
-          </div>
-          <div class="content">
-            <p>Hi ${booking.clientName},</p>
-            <p>Thank you for booking with <strong>${business.businessName}</strong>! Your appointment has been confirmed.</p>
+  /**
+   * Send booking confirmation to client
+   */
+  async sendBookingConfirmation(booking, business, service) {
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: booking.clientEmail,
+        subject: `Booking Confirmation - ${business.businessName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #10b981; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">✅ Booking Confirmed!</h1>
+            </div>
             
-            <div class="booking-details">
-              <h3 style="margin-top: 0; color: #4CAF84;">📅 Booking Details</h3>
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <p style="font-size: 16px;">Hi ${booking.clientName},</p>
               
-              <div class="detail-row">
-                <span class="detail-label">Service:</span>
-                <span class="detail-value">${service.name}</span>
+              <p>Your appointment with <strong>${business.businessName}</strong> has been confirmed!</p>
+              
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: #10b981; margin-top: 0;">📋 Booking Details</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Service:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Date:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Time:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingTime}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Duration:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.duration}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Price:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.price}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;"><strong>Booking ID:</strong></td>
+                    <td style="padding: 8px 0;"><code>${booking.id}</code></td>
+                  </tr>
+                </table>
               </div>
-              
-              <div class="detail-row">
-                <span class="detail-label">Date:</span>
-                <span class="detail-value">${new Date(booking.bookingDate).toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}</span>
-              </div>
-              
-              <div class="detail-row">
-                <span class="detail-label">Time:</span>
-                <span class="detail-value">${formatTime(booking.bookingTime)}</span>
-              </div>
-              
-              <div class="detail-row">
-                <span class="detail-label">Duration:</span>
-                <span class="detail-value">${service.duration}</span>
-              </div>
-              
-              <div class="detail-row">
-                <span class="detail-label">Price:</span>
-                <span class="detail-value">${service.price}</span>
-              </div>
-              
-              <div class="detail-row">
-                <span class="detail-label">Status:</span>
-                <span class="detail-value"><span class="status-badge">PENDING</span></span>
-              </div>
-              
+
               ${booking.notes ? `
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f0f0f0;">
-                  <span class="detail-label">📝 Notes:</span>
-                  <p style="margin: 10px 0 0 0; color: #666;">${booking.notes}</p>
+                <div style="background-color: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                  <strong>📝 Your Notes:</strong>
+                  <p style="margin: 10px 0 0 0;">${booking.notes}</p>
                 </div>
               ` : ''}
-            </div>
 
-            ${booking.hasChatHistory ? `
-              <div style="background-color: #E3F2FD; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <p style="margin: 0;"><strong>💬 Chat History Available</strong></p>
-                <p style="margin: 5px 0 0 0; font-size: 14px; color: #555;">
-                  This booking has associated chat messages. You can view your conversation history with ${business.businessName}.
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #10b981; margin-top: 0;">📍 Location</h3>
+                <p>${business.location || 'Address not provided'}</p>
+                
+                ${business.phone ? `<p><strong>📞 Phone:</strong> ${business.phone}</p>` : ''}
+                ${business.email ? `<p><strong>📧 Email:</strong> ${business.email}</p>` : ''}
+              </div>
+
+              <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+                <p style="margin: 0;"><strong>⏰ Reminders:</strong></p>
+                <p style="margin: 10px 0 0 0;">You'll receive email reminders 24 hours and 1 hour before your appointment.</p>
+              </div>
+
+              <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #6b7280; font-size: 14px;">
+                  Need to make changes? Contact us at ${business.email || business.phone || 'the business'}
                 </p>
               </div>
-            ` : ''}
-
-            <div style="background-color: #FFF3E0; padding: 15px; border-radius: 5px; margin: 20px 0;">
-              <p style="margin: 0;"><strong>📍 Business Information</strong></p>
-              <p style="margin: 10px 0 0 0;">
-                <strong>${business.businessName}</strong><br>
-                ${business.location || 'Location not specified'}<br>
-                ${business.phone || ''}<br>
-                ${business.email}
-              </p>
             </div>
 
-            ${business.bookingPolicyDescription ? `
-              <div style="background-color: #F5F5F5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <p style="margin: 0;"><strong>📋 ${business.bookingPolicyTitle || 'Booking Policy'}</strong></p>
-                <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">
-                  ${business.bookingPolicyDescription}
-                </p>
-              </div>
-            ` : ''}
-
-            <p style="text-align: center;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/${business.slug}" class="button">
-                View My Bookings
-              </a>
-            </p>
-
-            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
-              <p style="font-size: 14px; color: #666;">
-                <strong>Need to make changes?</strong><br>
-                Contact ${business.businessName} at ${business.email} or visit their booking page to reschedule or cancel.
-              </p>
-            </div>
-
-            <div class="footer">
-              <p>Booking ID: ${booking.id}</p>
-              <p>This is an automated confirmation email from ${business.businessName}</p>
+            <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} ${business.businessName}. All rights reserved.</p>
             </div>
           </div>
-        </div>
-      </body>
-      </html>
-    `
-  };
+        `
+      };
 
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log('✅ Booking confirmation email sent to:', booking.clientEmail);
-    return true;
-  } catch (error) {
-    console.error('❌ Error sending booking confirmation email:', error);
-    return false;
-  }
-};
+      await this.transporter.sendMail(mailOptions);
+      console.log('✅ Confirmation email sent to client:', booking.clientEmail);
 
-/**
- * Send booking status update email to client
- */
-const sendBookingStatusUpdate = async (booking, business, service, oldStatus, newStatus) => {
-  emailCount++;
-  console.log(`📧 Booking status update email (${emailCount} today)`);
+      // Send notification to business
+      await this.sendBusinessBookingNotification(booking, business, service);
 
-  const statusMessages = {
-    confirmed: {
-      subject: 'Booking Confirmed',
-      title: '✅ Your booking has been confirmed!',
-      message: 'Great news! Your booking has been confirmed by the business.',
-      color: '#4CAF50'
-    },
-    cancelled: {
-      subject: 'Booking Cancelled',
-      title: '❌ Your booking has been cancelled',
-      message: 'Your booking has been cancelled. If you have any questions, please contact the business.',
-      color: '#F44336'
-    },
-    completed: {
-      subject: 'Booking Completed',
-      title: '🎉 Service completed!',
-      message: 'Thank you for choosing our service! We hope you had a great experience.',
-      color: '#2196F3'
+    } catch (error) {
+      console.error('❌ Error sending confirmation email:', error);
+      throw error;
     }
-  };
-
-  const statusInfo = statusMessages[newStatus] || {
-    subject: 'Booking Status Updated',
-    title: '📝 Your booking status has been updated',
-    message: `Your booking status has been changed from ${oldStatus} to ${newStatus}.`,
-    color: '#9E9E9E'
-  };
-
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: booking.clientEmail,
-    subject: `${statusInfo.subject} - ${service.name} at ${business.businessName}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background-color: ${statusInfo.color}; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-          .content { background-color: #f9f9f9; padding: 20px; border-radius: 0 0 5px 5px; }
-          .booking-details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 5px; border: 1px solid #ddd; }
-          .detail-row { padding: 8px 0; }
-          .button { display: inline-block; background-color: ${statusInfo.color}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 20px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #999; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h2>${statusInfo.title}</h2>
-          </div>
-          <div class="content">
-            <p>Hi ${booking.clientName},</p>
-            <p>${statusInfo.message}</p>
-            
-            <div class="booking-details">
-              <h3 style="margin-top: 0;">📅 Booking Information</h3>
-              <div class="detail-row"><strong>Service:</strong> ${service.name}</div>
-              <div class="detail-row"><strong>Date:</strong> ${new Date(booking.bookingDate).toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}</div>
-              <div class="detail-row"><strong>Time:</strong> ${formatTime(booking.bookingTime)}</div>
-              <div class="detail-row"><strong>Status:</strong> ${newStatus.toUpperCase()}</div>
-              <div class="detail-row"><strong>Booking ID:</strong> ${booking.id}</div>
-            </div>
-
-            <p style="text-align: center;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/${business.slug}" class="button">
-                View Booking Details
-              </a>
-            </p>
-
-            <div style="margin-top: 20px; padding: 15px; background-color: #F5F5F5; border-radius: 5px;">
-              <p style="margin: 0;"><strong>Need Help?</strong></p>
-              <p style="margin: 10px 0 0 0; font-size: 14px;">
-                Contact ${business.businessName} at ${business.email}
-              </p>
-            </div>
-
-            <div class="footer">
-              <p>This email was sent regarding your booking with ${business.businessName}</p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log('✅ Status update email sent to:', booking.clientEmail);
-    return true;
-  } catch (error) {
-    console.error('❌ Error sending status update email:', error);
-    return false;
   }
-};
 
-// ==================== CHAT EMAILS ====================
+  /**
+   * Send new booking notification to business
+   */
+  async sendBusinessBookingNotification(booking, business, service) {
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: business.email,
+        subject: `New Booking - ${booking.clientName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #10b981; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">🔔 New Booking Received</h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <p style="font-size: 16px;">Hi ${business.businessName},</p>
+              
+              <p>You have a new booking!</p>
+              
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: #10b981; margin-top: 0;">👤 Client Information</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Name:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.clientName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Email:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.clientEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Phone:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.clientPhone || 'Not provided'}</td>
+                  </tr>
+                  ${booking.clientAddress ? `
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Address:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.clientAddress}</td>
+                  </tr>
+                  ` : ''}
+                </table>
+              </div>
+
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: #10b981; margin-top: 0;">📅 Appointment Details</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Service:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Date:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Time:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingTime}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Duration:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.duration}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;"><strong>Status:</strong></td>
+                    <td style="padding: 8px 0;"><span style="background-color: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 12px;">PENDING</span></td>
+                  </tr>
+                </table>
+              </div>
+
+              ${booking.notes ? `
+                <div style="background-color: white; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                  <strong>📝 Client Notes:</strong>
+                  <p style="margin: 10px 0 0 0;">${booking.notes}</p>
+                </div>
+              ` : ''}
+
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${process.env.FRONTEND_URL}/business/dashboard" 
+                   style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  View in Dashboard
+                </a>
+              </div>
+            </div>
+
+            <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">This is an automated notification from your booking system.</p>
+            </div>
+          </div>
+        `
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      console.log('✅ Business notification sent to:', business.email);
+
+    } catch (error) {
+      console.error('❌ Error sending business notification:', error);
+      // Don't throw - this is secondary notification
+    }
+  }
+
+  /**
+   * Send booking status update email
+   */
+  async sendBookingStatusUpdate(booking, business, service, oldStatus, newStatus) {
+    try {
+      const statusMessages = {
+        confirmed: '✅ Your booking has been confirmed!',
+        cancelled: '❌ Your booking has been cancelled',
+        completed: '✅ Your appointment is complete'
+      };
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: booking.clientEmail,
+        subject: `Booking ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)} - ${business.businessName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: ${newStatus === 'cancelled' ? '#ef4444' : '#10b981'}; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">${statusMessages[newStatus] || 'Booking Updated'}</h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <p style="font-size: 16px;">Hi ${booking.clientName},</p>
+              
+              <p>Your booking status has been updated from <strong>${oldStatus}</strong> to <strong>${newStatus}</strong>.</p>
+              
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="margin-top: 0;">Booking Details</h2>
+                <p><strong>Service:</strong> ${service.name}</p>
+                <p><strong>Date:</strong> ${booking.bookingDate}</p>
+                <p><strong>Time:</strong> ${booking.bookingTime}</p>
+                <p><strong>Status:</strong> <span style="text-transform: uppercase; font-weight: bold;">${newStatus}</span></p>
+              </div>
+
+              ${newStatus === 'cancelled' ? `
+                <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0;">If you'd like to book again, please visit our booking page.</p>
+                </div>
+              ` : ''}
+
+              <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #6b7280; font-size: 14px;">
+                  Questions? Contact us at ${business.email || business.phone}
+                </p>
+              </div>
+            </div>
+
+            <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} ${business.businessName}</p>
+            </div>
+          </div>
+        `
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      console.log('✅ Status update email sent to:', booking.clientEmail);
+
+    } catch (error) {
+      console.error('❌ Error sending status update email:', error);
+      throw error;
+    }
+  }
+}
+
+// ==================== CHAT EMAIL FUNCTIONS ====================
 
 /**
  * Send notification email to client for new chat message
@@ -378,7 +389,7 @@ const sendBusinessNotification = async (businessEmail, businessName, clientName,
               ${message.length > 200 ? message.substring(0, 200) + '...' : message}
             </div>
             <p style="text-align: center;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/messages" class="button">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/business/dashboard" class="button">
                 View & Reply
               </a>
             </p>
@@ -414,9 +425,11 @@ function formatTime(time24) {
   return `${displayHour}:${String(minutes).padStart(2, '0')} ${ampm}`;
 }
 
-module.exports = {
-  sendBookingConfirmation,
-  sendBookingStatusUpdate,
-  sendClientNotification,
-  sendBusinessNotification
-};
+// ==================== EXPORTS ====================
+
+// Export class constructor for booking emails (used in bookings route)
+module.exports = (transporter) => new EmailService(transporter);
+
+// Export individual functions for chat emails (used in chat route)
+module.exports.sendClientNotification = sendClientNotification;
+module.exports.sendBusinessNotification = sendBusinessNotification;

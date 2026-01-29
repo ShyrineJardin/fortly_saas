@@ -6,10 +6,10 @@ const googleCalendarService = require('../services/googleCalendarService');
 
 /**
  * Google Calendar Integration Routes
- * Handles OAuth2 flow and calendar management
+ * Handles OAuth2 flow for BOTH business and client calendars
  */
 
-// ==================== CONNECT GOOGLE CALENDAR ====================
+// ==================== BUSINESS: CONNECT GOOGLE CALENDAR ====================
 router.get('/connect', authMiddleware, async (req, res) => {
   try {
     const authUrl = googleCalendarService.getAuthUrl(
@@ -27,7 +27,33 @@ router.get('/connect', authMiddleware, async (req, res) => {
   }
 });
 
-// ==================== OAUTH CALLBACK ====================
+// ==================== CLIENT: CONNECT GOOGLE CALENDAR ====================
+router.get('/connect-client', async (req, res) => {
+  try {
+    const { clientEmail, bookingId } = req.query;
+
+    if (!clientEmail) {
+      return res.status(400).json({ message: 'Client email required' });
+    }
+
+    // Generate auth URL for client
+    const authUrl = googleCalendarService.getAuthUrl(
+      clientEmail, // Use email as userId for clients
+      'client',
+      bookingId
+    );
+    
+    res.json({ 
+      authUrl,
+      message: 'Redirect client to this URL to authorize their Google Calendar'
+    });
+  } catch (error) {
+    console.error('❌ Error generating client auth URL:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ==================== OAUTH CALLBACK (HANDLES BOTH BUSINESS & CLIENT) ====================
 router.get('/callback', async (req, res) => {
   try {
     const { code, state } = req.query;
@@ -39,11 +65,12 @@ router.get('/callback', async (req, res) => {
     console.log('📥 Received OAuth callback');
 
     // Parse state to get user info
-    let userId, userType;
+    let userId, userType, bookingId;
     try {
       const stateData = JSON.parse(decodeURIComponent(state));
       userId = stateData.userId;
       userType = stateData.userType;
+      bookingId = stateData.bookingId;
     } catch (parseError) {
       console.error('❌ Error parsing state:', parseError);
       return res.status(400).send('Invalid state parameter');
@@ -54,8 +81,8 @@ router.get('/callback', async (req, res) => {
     
     console.log('✅ Received tokens from Google');
 
-    // Save tokens to business
     if (userType === 'business') {
+      // Save tokens to business
       await db.Business.update(
         {
           googleCalendarTokens: JSON.stringify(tokens),
@@ -64,15 +91,84 @@ router.get('/callback', async (req, res) => {
         { where: { id: userId } }
       );
       
-      console.log('✅ Tokens saved to database for business:', userId);
-    }
+      console.log('✅ Business calendar connected:', userId);
+      res.redirect(`${process.env.FRONTEND_URL}/business/dashboard?calendar=connected`);
 
-    // Redirect back to dashboard with success message
-    res.redirect(`${process.env.FRONTEND_URL}/business/dashboard?calendar=connected`);
+    } else if (userType === 'client') {
+      // Save tokens for client
+      const [clientToken, created] = await db.ClientCalendarToken.findOrCreate({
+        where: { clientEmail: userId },
+        defaults: {
+          clientEmail: userId,
+          googleCalendarTokens: JSON.stringify(tokens),
+          isConnected: true,
+          lastSyncedAt: new Date()
+        }
+      });
+
+      if (!created) {
+        await clientToken.update({
+          googleCalendarTokens: JSON.stringify(tokens),
+          isConnected: true,
+          lastSyncedAt: new Date()
+        });
+      }
+
+      console.log('✅ Client calendar connected:', userId);
+
+      // If there's a pending booking, create the calendar event now
+      if (bookingId) {
+        try {
+          const booking = await db.Booking.findByPk(bookingId, {
+            include: [
+              { model: db.Service, as: 'Service' },
+              { model: db.Business, as: 'Business' }
+            ]
+          });
+
+          if (booking && booking.Business.googleCalendarTokens) {
+            // Get chat messages
+            const chatMessages = await db.Message.findAll({
+              where: {
+                businessId: booking.businessId,
+                clientEmail: booking.clientEmail
+              },
+              order: [['createdAt', 'ASC']],
+              limit: 20
+            });
+
+            // Create events in both calendars
+            const eventIds = await googleCalendarService.createBookingEvent(
+              booking,
+              booking.Business,
+              booking.Service,
+              JSON.parse(booking.Business.googleCalendarTokens),
+              tokens,
+              chatMessages
+            );
+
+            // Update booking with both event IDs
+            await booking.update({
+              googleCalendarEventId: eventIds.businessEventId,
+              clientCalendarEventId: eventIds.clientEventId
+            });
+
+            console.log('✅ Booking synced to both calendars:', bookingId);
+          }
+        } catch (syncError) {
+          console.error('⚠️ Error syncing booking to client calendar:', syncError);
+        }
+      }
+
+      res.redirect(`${process.env.FRONTEND_URL}/booking-success?calendar=connected`);
+    }
 
   } catch (error) {
     console.error('❌ OAuth callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL}/business/dashboard?calendar=error`);
+    const redirectUrl = userType === 'business' 
+      ? '/business/dashboard?calendar=error'
+      : '/booking-success?calendar=error';
+    res.redirect(`${process.env.FRONTEND_URL}${redirectUrl}`);
   }
 });
 
@@ -98,6 +194,30 @@ router.get('/status', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== CLIENT: CHECK CONNECTION STATUS ====================
+router.get('/status-client', async (req, res) => {
+  try {
+    const { clientEmail } = req.query;
+
+    if (!clientEmail) {
+      return res.status(400).json({ message: 'Client email required' });
+    }
+
+    const clientToken = await db.ClientCalendarToken.findOne({
+      where: { clientEmail, isConnected: true }
+    });
+
+    res.json({
+      connected: !!clientToken,
+      connectedAt: clientToken?.updatedAt
+    });
+
+  } catch (error) {
+    console.error('❌ Check client status error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ==================== DISCONNECT CALENDAR ====================
 router.delete('/disconnect', authMiddleware, async (req, res) => {
   try {
@@ -114,6 +234,28 @@ router.delete('/disconnect', authMiddleware, async (req, res) => {
     res.json({ message: 'Calendar disconnected successfully' });
   } catch (error) {
     console.error('❌ Disconnect calendar error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ==================== CLIENT: DISCONNECT CALENDAR ====================
+router.delete('/disconnect-client', async (req, res) => {
+  try {
+    const { clientEmail } = req.body;
+
+    if (!clientEmail) {
+      return res.status(400).json({ message: 'Client email required' });
+    }
+
+    await db.ClientCalendarToken.destroy({
+      where: { clientEmail }
+    });
+
+    console.log('✅ Client calendar disconnected:', clientEmail);
+
+    res.json({ message: 'Calendar disconnected successfully' });
+  } catch (error) {
+    console.error('❌ Disconnect client calendar error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -149,14 +291,34 @@ router.post('/sync-bookings', authMiddleware, async (req, res) => {
 
     for (const booking of bookings) {
       try {
-        const calendarEvent = await googleCalendarService.createBookingEvent(
+        // Get client calendar tokens if they exist
+        const clientToken = await db.ClientCalendarToken.findOne({
+          where: { clientEmail: booking.clientEmail, isConnected: true }
+        });
+
+        // Get chat messages
+        const chatMessages = await db.Message.findAll({
+          where: {
+            businessId: business.id,
+            clientEmail: booking.clientEmail
+          },
+          order: [['createdAt', 'ASC']],
+          limit: 20
+        });
+
+        const eventIds = await googleCalendarService.createBookingEvent(
           booking,
           business,
           booking.Service,
-          JSON.parse(business.googleCalendarTokens)
+          JSON.parse(business.googleCalendarTokens),
+          clientToken ? JSON.parse(clientToken.googleCalendarTokens) : null,
+          chatMessages
         );
 
-        await booking.update({ googleCalendarEventId: calendarEvent.id });
+        await booking.update({ 
+          googleCalendarEventId: eventIds.businessEventId,
+          clientCalendarEventId: eventIds.clientEventId
+        });
         successCount++;
 
       } catch (eventError) {
@@ -178,7 +340,7 @@ router.post('/sync-bookings', authMiddleware, async (req, res) => {
   }
 });
 
-// ==================== REFRESH TOKEN (INTERNAL) ====================
+// ==================== REFRESH TOKEN ====================
 router.post('/refresh-token', authMiddleware, async (req, res) => {
   try {
     const business = await db.Business.findByPk(req.business.id);
@@ -195,12 +357,10 @@ router.post('/refresh-token', authMiddleware, async (req, res) => {
       });
     }
 
-    // Refresh the access token
     const newTokens = await googleCalendarService.refreshAccessToken(
       currentTokens.refresh_token
     );
 
-    // Save new tokens
     await business.update({
       googleCalendarTokens: JSON.stringify({
         ...currentTokens,
@@ -215,7 +375,6 @@ router.post('/refresh-token', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('❌ Refresh token error:', error);
     
-    // If refresh fails, disconnect calendar
     await db.Business.update(
       {
         googleCalendarTokens: null,

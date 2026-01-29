@@ -2,7 +2,6 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-// Create axios instance
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -10,7 +9,6 @@ const api = axios.create({
   }
 });
 
-// Add token to requests if it exists
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -24,12 +22,10 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
       localStorage.removeItem('token');
       window.location.href = '/business/login';
     }
@@ -38,7 +34,6 @@ api.interceptors.response.use(
 );
 
 // ==================== AUTH API ====================
-
 export const authAPI = {
   signup: (data) => api.post('/auth/signup', data),
   login: (data) => api.post('/auth/login', data),
@@ -47,7 +42,6 @@ export const authAPI = {
 };
 
 // ==================== BUSINESS API ====================
-
 export const businessAPI = {
   getBySlug: (slug) => api.get(`/business/${slug}`),
   completeOnboarding: (formData) => {
@@ -60,15 +54,37 @@ export const businessAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  // Booking Policy
   updateBookingPolicy: (data) => api.put('/business/booking-policy', data),
-  // Google Calendar
-  connectGoogleCalendar: () => api.get('/business/google-calendar/connect'),
-  disconnectGoogleCalendar: () => api.delete('/business/google-calendar/disconnect')
+  
+  // Business Google Calendar
+  connectGoogleCalendar: () => api.get('/google-calendar/connect'),
+  disconnectGoogleCalendar: () => api.delete('/google-calendar/disconnect'),
+  getCalendarStatus: () => api.get('/google-calendar/status'),
+  syncBookings: () => api.post('/google-calendar/sync-bookings')
+};
+
+// ==================== CLIENT CALENDAR API (NEW) ====================
+export const clientCalendarAPI = {
+  // Get auth URL for client calendar connection
+  getAuthUrl: (clientEmail, bookingId = null) => 
+    api.get('/google-calendar/connect-client', { 
+      params: { clientEmail, bookingId } 
+    }),
+  
+  // Check if client has connected calendar
+  checkStatus: (clientEmail) => 
+    api.get('/google-calendar/status-client', { 
+      params: { clientEmail } 
+    }),
+  
+  // Disconnect client calendar
+  disconnect: (clientEmail) => 
+    api.delete('/google-calendar/disconnect-client', { 
+      data: { clientEmail } 
+    })
 };
 
 // ==================== SERVICES API ====================
-
 export const servicesAPI = {
   getByBusinessSlug: (slug) => api.get(`/services/business/${slug}`),
   getMyServices: () => api.get('/services/my-services'),
@@ -86,7 +102,6 @@ export const servicesAPI = {
 };
 
 // ==================== GALLERY API ====================
-
 export const galleryAPI = {
   getByBusinessSlug: (slug) => api.get(`/gallery/business/${slug}`),
   getMyGallery: () => api.get('/gallery/my-gallery'),
@@ -99,39 +114,27 @@ export const galleryAPI = {
   delete: (id) => api.delete(`/gallery/${id}`)
 };
 
-// ==================== BOOKINGS API ====================
-
+// ==================== BOOKINGS API (UPDATED) ====================
 export const bookingsAPI = {
-  // Create a new booking (client)
+  // Create a new booking with optional calendar sync
   create: (data) => api.post('/bookings', data),
   
-  // Get business bookings (authenticated)
+  // Reschedule booking (NEW)
+  reschedule: (id, data) => api.put(`/bookings/${id}/reschedule`, data),
+  
   getMyBookings: (params) => api.get('/bookings/my-bookings', { params }),
-  
-  // Get booking by ID (authenticated)
   getById: (id) => api.get(`/bookings/${id}`),
-  
-  // Update booking status (authenticated)
   updateStatus: (id, status) => api.put(`/bookings/${id}/status`, { status }),
-  
-  // Get available time slots for a date
   getAvailableSlots: (businessSlug, date, params) => 
     api.get(`/bookings/available-slots/${businessSlug}/${date}`, { params }),
-  
-  // Check if a specific slot is available
   checkAvailability: (data) => api.post('/bookings/check-availability', data),
-  
-  // Cancel booking (client)
   cancelBooking: (id, clientEmail) => 
     api.put(`/bookings/${id}/cancel`, { clientEmail }),
-  
-  // Get client bookings
   getClientBookings: (clientEmail, params) => 
     api.get(`/bookings/client/${clientEmail}`, { params })
 };
 
 // ==================== CHAT API ====================
-
 export const chatAPI = {
   getConversations: () => api.get('/chat/conversations'),
   getMessages: (clientEmail) => api.get(`/chat/messages/${clientEmail}`),
@@ -143,7 +146,6 @@ export const chatAPI = {
 };
 
 // ==================== REVIEWS API ====================
-
 export const reviewsAPI = {
   getByBusinessSlug: (slug) => api.get(`/reviews/business/${slug}`),
   getMyReviews: (params) => api.get('/reviews/my-reviews', { params }),
@@ -152,7 +154,6 @@ export const reviewsAPI = {
 };
 
 // ==================== AUTH HELPERS ====================
-
 export const setAuthToken = (token) => {
   localStorage.setItem('token', token);
 };

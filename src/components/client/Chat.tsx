@@ -421,12 +421,27 @@ export default function ChatWidget({
     if (file && userEmail) {
       const fileType = file.type.startsWith('image/') ? 'image' : 
                       file.type.startsWith('video/') ? 'video' : null;
-      
+
       if (fileType) {
         const reader = new FileReader();
         reader.onload = async (event) => {
           const result = event.target?.result;
           if (result && typeof result === 'string') {
+            const tempId = `temp-${Date.now()}`;
+            const optimisticMessage: Message = {
+              id: tempId,
+              sender: 'client',
+              text: file.name,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              type: fileType,
+              content: result,
+              fileName: file.name,
+              createdAt: new Date().toISOString()
+            };
+
+            setMessages(prev => [...prev, optimisticMessage]);
+            setTimeout(scrollToBottom, 50);
+
             try {
               await axios.post(`${apiBaseUrl}/chat/send-client`, {
                 businessSlug,
@@ -436,10 +451,11 @@ export default function ChatWidget({
                 messageType: fileType,
                 fileContent: result
               });
-              
+
               await loadMessages(userEmail, true);
             } catch (error) {
               console.error('Error sending file:', error);
+              setMessages(prev => prev.filter(msg => msg.id !== tempId));
             }
           }
         };
@@ -451,18 +467,33 @@ export default function ChatWidget({
 
   const handleSendMessage = async () => {
     if (message.trim() && userEmail) {
+      const messageText = message.trim();
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        sender: 'client',
+        text: messageText,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: null,
+        createdAt: new Date().toISOString()
+      };
+
+      setMessages(prev => [...prev, optimisticMessage]);
+      setMessage(""); 
+      setTimeout(scrollToBottom, 50);
+
       try {
         await axios.post(`${apiBaseUrl}/chat/send-client`, {
           businessSlug,
           clientEmail: userEmail,
           clientName: userName,
-          message: message.trim()
+          message: messageText
         });
-        
-        setMessage("");
+
         await loadMessages(userEmail, true);
       } catch (error) {
-        console.error('Error sending message:', error);
+        console.error('Error sending message:', error);        setMessages(prev => prev.filter(msg => msg.id !== tempId));
+        setMessage(messageText);
       }
     }
   };

@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, Navigate, useParams } from "react-router-dom";
-import { FaFacebook, FaXTwitter, FaInstagram, FaLinkedin } from 'react-icons/fa6'
+import { FaFacebook, FaXTwitter, FaInstagram, FaLinkedin, FaCalendar, FaCheck } from 'react-icons/fa6'
 import { BsFillTelephoneFill } from "react-icons/bs";
 import { MdEmail } from "react-icons/md";
 import ServiceCard from "../shared/ServiceCard";
 import Footer from "../client/Footer";
-import { businessAPI } from '../../utils/api';
+import { businessAPI, clientCalendarAPI, bookingsAPI } from '../../utils/api';
 
 export default function Confirmation() {
     const location = useLocation();
     const { businessSlug } = useParams<{ businessSlug: string }>();
     const [businessData, setBusinessData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    
+    // Calendar sync states
+    const [calendarConnected, setCalendarConnected] = useState(false);
+    const [showCalendarOption, setShowCalendarOption] = useState(false);
+    const [connectingCalendar, setConnectingCalendar] = useState(false);
     
     // Catch the service data passed from the Booking page
     const selectedService = location.state?.selectedService;
@@ -20,11 +25,36 @@ export default function Confirmation() {
     const customerInfo = location.state?.customerInfo;
     const bookingData = location.state?.booking;
     const bookingDetails = location.state?.bookingDetails;
+    
+    // Get calendar sync status from booking response
+    const calendarSync = location.state?.calendarSync;
+    const hasChatHistory = location.state?.hasChatHistory;
+    const chatMessageCount = location.state?.chatMessageCount;
 
     // Fetch business data from API (same as ClientSidebar)
     useEffect(() => {
         fetchBusinessData();
     }, [businessSlug]);
+
+    // Check calendar sync status
+    useEffect(() => {
+        // Check if calendar was just connected via URL params
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('calendar') === 'connected') {
+            setCalendarConnected(true);
+            setShowCalendarOption(false);
+        }
+
+        // Show calendar option if client needs to authorize
+        if (calendarSync?.requiresClientAuth && calendarSync?.clientAuthUrl) {
+            setShowCalendarOption(true);
+        }
+
+        // Check if client already has calendar connected
+        if (bookingData?.clientEmail) {
+            checkCalendarStatus();
+        }
+    }, [calendarSync, bookingData]);
 
     const fetchBusinessData = async () => {
         try {
@@ -35,6 +65,45 @@ export default function Confirmation() {
             console.error('Error fetching business data:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Check if client has calendar connected
+    const checkCalendarStatus = async () => {
+        try {
+            const response = await clientCalendarAPI.checkStatus(bookingData.clientEmail);
+            if (response.data.connected) {
+                setCalendarConnected(true);
+                setShowCalendarOption(false);
+            }
+        } catch (error) {
+            console.error('Error checking calendar status:', error);
+        }
+    };
+
+    // Handle calendar connection
+    const handleConnectCalendar = async () => {
+        try {
+            setConnectingCalendar(true);
+            
+            // If we already have the auth URL from booking
+            if (calendarSync?.clientAuthUrl) {
+                window.location.href = calendarSync.clientAuthUrl;
+                return;
+            }
+
+            // Otherwise, get a new auth URL
+            const response = await clientCalendarAPI.getAuthUrl(
+                bookingData.clientEmail,
+                bookingData.id
+            );
+
+            // Redirect to Google OAuth
+            window.location.href = response.data.authUrl;
+        } catch (error) {
+            console.error('Error getting auth URL:', error);
+            alert('Failed to connect calendar. Please try again.');
+            setConnectingCalendar(false);
         }
     };
 
@@ -106,7 +175,7 @@ export default function Confirmation() {
             return '';
         }
         
-             try {
+        try {
             const timeParts = startTime.split(':');
             if (timeParts.length < 2) return '';
             
@@ -201,6 +270,30 @@ export default function Confirmation() {
         window.location.href = `/${businessSlug}/services`;
     };
 
+    const handleCancelBooking = async () => {
+        if (!bookingData?.id || !bookingData?.clientEmail) {
+            alert('Unable to cancel booking. Missing booking information.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+
+            // Call cancel API
+            await bookingsAPI.cancelBooking(bookingData.id, bookingData.clientEmail);
+
+            alert('Booking cancelled successfully. You will receive a confirmation email.');
+            
+            // Redirect to services page
+            window.location.href = `/${businessSlug}/services`;
+
+        } catch (error: any) {
+            console.error('Error cancelling booking:', error);
+            alert(error.response?.data?.message || 'Failed to cancel booking. Please try again or contact the business.');
+            setLoading(false);
+        }
+    };
+
     // Try to get date/time from different possible sources
     const finalDate = bookingDate || bookingDetails?.date || bookingData?.bookingDate;
     const finalTime = bookingTime || bookingDetails?.time || bookingData?.bookingTime;
@@ -219,7 +312,6 @@ export default function Confirmation() {
 
         return `${hours.padStart(2, '0')}:${minutes}:00`;
     };
-
 
     const isDateAlreadyFormatted = finalDate?.includes(',');
     const formattedDate = isDateAlreadyFormatted ? finalDate : formatDate(finalDate);
@@ -275,26 +367,102 @@ export default function Confirmation() {
                         <div className='mt-2 flex flex-col items-center justify-center text-textSecondary'>
                             {businessData?.phone && (
                                 <a 
-                                      href={`tel:${businessData.phone}`}
-                                      className='flex items-center mb-1 gap-2 hover:text-emerald-600 transition'
-                                    >
-                                      {BsFillTelephoneFill({size: 12})}
-                                      <span className="text-xs">{businessData.phone}</span>
+                                    href={`tel:${businessData.phone}`}
+                                    className='flex items-center mb-1 gap-2 hover:text-emerald-600 transition'
+                                >
+                                    {BsFillTelephoneFill({size: 12})}
+                                    <span className="text-xs">{businessData.phone}</span>
                                 </a>
                             )}
                             {businessData?.email && (
-                               <a 
-                                     href={`mailto:${businessData.email}`}
-                                     className='flex items-center gap-2 hover:text-emerald-600 transition'
-                                   >
-                                     {MdEmail({size: 12})}
-                                     <span className="text-xs">{businessData.email}</span>
+                                <a 
+                                    href={`mailto:${businessData.email}`}
+                                    className='flex items-center gap-2 hover:text-emerald-600 transition'
+                                >
+                                    {MdEmail({size: 12})}
+                                    <span className="text-xs">{businessData.email}</span>
                                 </a>
                             )}
                         </div>
                     </div>
 
-                    <div className="mt-8">
+                    {/* ✅ NEW: Calendar Sync Status */}
+                    {(calendarSync || calendarConnected) && (
+                        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                                {FaCalendar({ className: "w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" })}
+                                <div className="flex-1">
+                                    <h3 className="font-semibold text-blue-900 text-sm mb-2">
+                                        Google Calendar Status
+                                    </h3>
+                                    
+                                    {/* Business calendar synced */}
+                                    {calendarSync?.businessCalendarSynced && (
+                                        <div className="flex items-center gap-2 text-green-700 mb-2 text-sm">
+                                            {FaCheck({ className: "w-4 h-4" })}
+                                            <span>Added to business calendar</span>
+                                        </div>
+                                    )}
+
+                                    {/* Client calendar synced */}
+                                    {(calendarConnected || calendarSync?.clientCalendarSynced) && (
+                                        <div className="flex items-center gap-2 text-green-700 mb-2 text-sm">
+                                            {FaCheck({ className: "w-4 h-4" })}
+                                            <span>Added to your Google Calendar</span>
+                                        </div>
+                                    )}
+
+                                    {/* Show "Add to Calendar" button if needed */}
+                                    {showCalendarOption && !calendarConnected && (
+                                        <div className="mt-3">
+                                            <p className="text-sm text-blue-800 mb-3">
+                                                📅 Want this appointment in your Google Calendar?
+                                            </p>
+                                            <button
+                                                onClick={handleConnectCalendar}
+                                                disabled={connectingCalendar}
+                                                className="px-4 py-2 bg-primaryGreen text-white rounded-lg hover:bg-hoverGreen transition text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {connectingCalendar ? (
+                                                    <>
+                                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                        Connecting...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {FaCalendar({ className: "w-4 h-4" })}
+                                                        Add to My Calendar
+                                                    </>
+                                                )}
+                                            </button>
+                                            <p className="text-xs text-gray-600 mt-2">
+                                                This will automatically add the appointment to your Google Calendar with all details and reminders
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Default message if no sync option */}
+                                    {!showCalendarOption && !calendarConnected && !calendarSync?.clientCalendarSynced && (
+                                        <p className="text-sm text-blue-800">
+                                            📧 Check your email for calendar invitation
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ✅ NEW: Chat History Notice */}
+                    {hasChatHistory && chatMessageCount > 0 && (
+                        <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-3">
+                            <p className="text-sm text-purple-800">
+                                💬 <strong>{chatMessageCount} message{chatMessageCount !== 1 ? 's' : ''}</strong> from your conversation 
+                                {calendarSync?.businessCalendarSynced && ' are included in the calendar event for reference'}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="mt-6">
                         <p className="text-gray-500 lg:text-sm text-xs mb-1">Date & Time</p>
                         <h3 className="text-textPrimary font-medium lg:text-base text-sm">
                             <span>{formattedDate}</span>
@@ -340,19 +508,69 @@ export default function Confirmation() {
                         </div>
                     )}
 
-                    <div className="mt-6">
-                        <p className="text-gray-600 lg:text-sm text-xs leading-relaxed text-center">
-                            You're all set! Your appointment has been confirmed. You should receive a confirmation email and calendar invite shortly.
-                        </p>
+                    {/* ✅ UPDATED: Enhanced confirmation message */}
+                    <div className="mt-6 bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="font-semibold text-sm mb-3">What happens next?</h3>
+                        <ul className="space-y-2 text-xs text-gray-700">
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-500 mt-0.5">✓</span>
+                                <span>You'll receive a confirmation email with all booking details</span>
+                            </li>
+                            {(calendarSync?.businessCalendarSynced || calendarConnected) && (
+                                <li className="flex items-start gap-2">
+                                    <span className="text-green-500 mt-0.5">✓</span>
+                                    <span>Calendar event created with reminders 24 hours and 1 hour before</span>
+                                </li>
+                            )}
+                            <li className="flex items-start gap-2">
+                                <span className="text-green-500 mt-0.5">✓</span>
+                                <span>You can reschedule or cancel anytime using the link in your email</span>
+                            </li>
+                            {hasChatHistory && (
+                                <li className="flex items-start gap-2">
+                                    <span className="text-green-500 mt-0.5">✓</span>
+                                    <span>Your conversation history is saved and referenced in the appointment</span>
+                                </li>
+                            )}
+                        </ul>
                     </div>
 
-                    <div className="mt-10 flex justify-center">
+                    <div className="mt-6 flex justify-center">
                         <button
                             onClick={handleBookAnother}
                             className="btn-primary w-full md:w-auto px-8"
                         >
                             Book another appointment
                         </button>
+                    </div>
+
+                    {/* Reschedule and Cancel Actions */}
+                    {bookingData?.id && (
+                        <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-center">
+                            <button
+                                onClick={() => {
+                                    if (window.confirm('Are you sure you want to cancel this booking?')) {
+                                        handleCancelBooking();
+                                    }
+                                }}
+                                className="btn-secondary text-red-600 border-red-600 hover:bg-red-50 w-full md:w-auto px-8"
+                            >
+                                ❌ Cancel Appointment
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Manage Booking Link */}
+                    <div className="mt-4 text-center">
+                        <p className="text-xs text-gray-600">
+                            Need to make changes?{' '}
+                            <a 
+                                href={`mailto:${businessData?.email || ''}`}
+                                className="text-primaryGreen hover:underline font-medium"
+                            >
+                                Contact us
+                            </a>
+                        </p>
                     </div>
                 </div>
             </main>

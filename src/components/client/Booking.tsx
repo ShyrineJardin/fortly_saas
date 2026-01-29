@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa6";
+import { FaChevronLeft, FaChevronRight, FaCalendar } from "react-icons/fa6";
 import BookingPolicy from "../shared/BookingPolicy";
 import ServiceCard from "../shared/ServiceCard";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -16,6 +16,9 @@ export default function BookingPage() {
   const [loading, setLoading] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState("");
+  const [takenTimeSlots, setTakenTimeSlots] = useState<any[]>([]);
+  const [syncToCalendar, setSyncToCalendar] = useState(false);
+
   
   const [formData, setFormData] = useState({
     fullName: "",
@@ -81,10 +84,18 @@ export default function BookingPage() {
 
     try {
       setLoadingSlots(true);
-      const formattedDate = date.toISOString().split('T')[0]; // YYYY-MM-DD
-      
-      console.log('🔍 Fetching slots for:', { date: formattedDate, serviceId: selectedService.id });
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const formattedDate = `${year}-${month}-${day}`;
 
+      console.log('🔍 Fetching slots for:', { 
+        date: formattedDate, 
+        dayOfWeek: date.toLocaleDateString('en-US', { weekday: 'long' }),
+        serviceId: selectedService.id 
+      });
+
+      // ✅ ADD THIS - The missing API call!
       const response = await bookingsAPI.getAvailableSlots(
         businessSlug,
         formattedDate,
@@ -94,13 +105,15 @@ export default function BookingPage() {
       console.log('✅ Received slots:', response.data);
 
       setAvailableTimeSlots(response.data.availableSlots || []);
+      setTakenTimeSlots(response.data.takenSlots || []);
       setMinAdvanceDays(response.data.minAdvanceDays || 0);
-      setSelectedTime(null); // Reset time selection when date changes
+      setSelectedTime(null);
 
     } catch (err: any) {
       console.error('❌ Error fetching slots:', err);
       setError(err.response?.data?.message || 'Failed to fetch available times');
       setAvailableTimeSlots([]);
+      setTakenTimeSlots([]);
     } finally {
       setLoadingSlots(false);
     }
@@ -149,11 +162,18 @@ export default function BookingPage() {
       return;
     }
 
+    
+
     try {
       setLoading(true);
 
       // Find the selected time slot object
       const selectedSlot = availableTimeSlots.find(slot => slot.display === selectedTime);
+      const year = selectedDate.getFullYear();
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDate.getDate()).padStart(2, '0');
+      const formattedBookingDate = `${year}-${month}-${day}`;
+
       
       // Format booking data
       const bookingData = {
@@ -163,9 +183,10 @@ export default function BookingPage() {
         clientEmail: formData.emailAddress,
         clientPhone: formData.mobileNumber,
         clientAddress: formData.address,
-        bookingDate: selectedDate.toISOString().split('T')[0],
+        bookingDate: formattedBookingDate,
         bookingTime: selectedSlot?.time || selectedTime,
-        notes: formData.message
+        notes: formData.message,
+        syncToClientCalendar: syncToCalendar
       };
 
       console.log('📤 Submitting booking:', bookingData);
@@ -190,7 +211,8 @@ export default function BookingPage() {
             ...formData
           },
           hasChatHistory: response.data.hasChatHistory,
-          chatMessageCount: response.data.chatMessageCount
+          chatMessageCount: response.data.chatMessageCount,
+          calendarSync: response.data.calendarSync
         }
       });
 
@@ -407,66 +429,39 @@ export default function BookingPage() {
             </div>
           </div>
 
-          {/* Time Selection Section */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                {selectedDate 
-                  ? selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-                  : 'Select a date'
-                }
-              </h3>
-              {selectedDate && (
-                <p className="text-xs text-gray-500">
-                  Available time slots for your appointment
-                </p>
-              )}
-            </div>
+          {/* Time slots - Available + Taken */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-96 overflow-y-auto p-4">
+            {/* Available Slots */}
+            {availableTimeSlots.map((slot, index) => (
+              <button
+                key={`available-${index}`}
+                onClick={() => setSelectedTime(slot.display)}
+                className={`
+                  py-3 px-4 rounded-lg border-2 font-medium text-sm
+                  transition-all duration-200
+                  ${selectedTime === slot.display
+                    ? "bg-primaryGreen text-white border-primaryGreen shadow-md scale-105"
+                    : "border-gray-200 text-gray-700 hover:border-primaryGreen hover:bg-green-50 hover:scale-105"
+                  }
+                `}
+              >
+                {slot.display}
+              </button>
+            ))}
 
-            {!selectedDate ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+            {/* Taken Slots - Grayed Out */}
+            {takenTimeSlots.map((slot, index) => (
+              <div
+                key={`taken-${index}`}
+                className="py-3 px-4 rounded-lg border-2 border-gray-200 bg-gray-100 text-gray-400 font-medium text-sm cursor-not-allowed relative group"
+                title={slot.reason}
+              >
+                {slot.display}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                  {slot.reason}
                 </div>
-                <p className="text-gray-500 text-sm">Select a date to see available times</p>
               </div>
-            ) : loadingSlots ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-12 h-12 border-4 border-primaryGreen border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-gray-500 text-sm">Checking availability...</p>
-              </div>
-            ) : availableTimeSlots.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-gray-600 font-medium mb-1">No available slots</p>
-                <p className="text-gray-500 text-sm">Please select another date</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-2">
-                {availableTimeSlots.map((slot, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedTime(slot.display)}
-                    className={`
-                      py-3 px-4 rounded-lg border-2 font-medium text-sm
-                      transition-all duration-200
-                      ${selectedTime === slot.display
-                        ? "bg-primaryGreen text-white border-primaryGreen shadow-md scale-105"
-                        : "border-gray-200 text-gray-700 hover:border-primaryGreen hover:bg-green-50 hover:scale-105"
-                      }
-                    `}
-                  >
-                    {slot.display}
-                  </button>
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
@@ -564,9 +559,23 @@ export default function BookingPage() {
             </label>
           </div>
 
+          <div className="flex items-center gap-3 w-full max-w-md">
+            <input
+              type="checkbox"
+              id="syncCalendar"
+              checked={syncToCalendar}
+              onChange={(e) => setSyncToCalendar(e.target.checked)}
+              className="w-5 h-5 mt-0.5 text-primaryGreen focus:ring-primaryGreen border-gray-300 rounded"
+            />
+            <label htmlFor="syncCalendar" className="text-sm text-gray-600 flex-1 flex items-center gap-2">
+              {FaCalendar({ className: "w-4 h-4 text-primaryGreen" })}
+              Add to my Google Calendar automatically
+            </label>
+          </div>
+
           <button
             onClick={handleSubmit}
-            disabled={!selectedDate || !selectedTime || !agreeToPolicy || !formData.fullName || !formData.emailAddress || !formData.mobileNumber || loading}
+            disabled={!selectedDate || !selectedTime || !agreeToPolicy || !syncToCalendar || !formData.fullName || !formData.emailAddress || !formData.mobileNumber || loading}
             className="btn-primary w-full md:w-auto px-12 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
           >
             {loading ? (

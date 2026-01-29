@@ -7,6 +7,10 @@ const socketIo = require('socket.io');
 const nodemailer = require('nodemailer');
 const db = require('./config/database');
 
+// Import Sequelize and DataTypes from db
+const { sequelize, Sequelize } = db;
+const { DataTypes } = Sequelize;
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const businessRoutes = require('./routes/business');
@@ -17,8 +21,14 @@ const chatRoutes = require('./routes/chat');
 const reviewRoutes = require('./routes/reviews');
 const googleCalendarRoutes = require('./routes/googleCalendar'); 
 
+// Now we can use sequelize and DataTypes
+const ClientCalendarToken = require('./models/ClientCalendarToken')(sequelize, DataTypes);
+
 const app = express();
 const server = http.createServer(app);
+
+// Add ClientCalendarToken to db object
+db.ClientCalendarToken = ClientCalendarToken;
 
 // Configure Socket.IO
 const io = socketIo(server, {
@@ -37,6 +47,12 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASSWORD
   }
 });
+
+// Set up associations (make sure Business model is available in db)
+if (db.Business) {
+  db.Business.hasMany(ClientCalendarToken, { foreignKey: 'businessId', as: 'clientTokens' });
+  ClientCalendarToken.belongsTo(db.Business, { foreignKey: 'businessId', as: 'Business' });
+}
 
 // Verify email configuration on startup
 transporter.verify((error, success) => {
@@ -129,7 +145,7 @@ app.use('/api/gallery', galleryRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/google-calendar', googleCalendarRoutes); 
+app.use('/api/googleCalendar', googleCalendarRoutes); 
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -206,12 +206,30 @@ export default function BusinessChat({
     if (file && activeChat) {
       const fileType = file.type.startsWith('image/') ? 'image' : 
                       file.type.startsWith('video/') ? 'video' : null;
-      
+
       if (fileType) {
         const reader = new FileReader();
         reader.onload = async (event) => {
           const result = event.target?.result;
           if (result && typeof result === 'string') {
+            const tempId = `temp-${Date.now()}`;
+            const optimisticMessage: Message = {
+              id: tempId,
+              sender: 'business',
+              text: file.name,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              type: fileType,
+              content: result,
+              fileName: file.name,
+              createdAt: new Date().toISOString()
+            };
+
+            setChatMessages(prev => ({
+              ...prev,
+              [activeChat]: [...(prev[activeChat] || []), optimisticMessage]
+            }));
+            setTimeout(scrollToBottom, 50);
+
             try {
               await axios.post(`${apiBaseUrl}/chat/send-business`, {
                 businessSlug,
@@ -220,10 +238,14 @@ export default function BusinessChat({
                 messageType: fileType,
                 fileContent: result
               });
-              
+
               await loadMessages(activeChat, true);
             } catch (error) {
               console.error('Error sending file:', error);
+              setChatMessages(prev => ({
+                ...prev,
+                [activeChat]: prev[activeChat].filter(msg => msg.id !== tempId)
+              }));
             }
           }
         };
@@ -234,20 +256,43 @@ export default function BusinessChat({
   };
 
   const handleSendMessage = async () => {
-    if (message.trim() && activeChat) {
-      try {
-        await axios.post(`${apiBaseUrl}/chat/send-business`, {
-          businessSlug,
-          clientEmail: activeChat,
-          message: message.trim()
-        });
-        
-        setMessage("");
-        await loadMessages(activeChat, true);
-      } catch (error) {
-        console.error('Error sending message:', error);
-      }
+  if (message.trim() && activeChat) {
+    const messageText = message.trim();
+    
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: tempId,
+      sender: 'business',
+      text: messageText,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: null,
+      createdAt: new Date().toISOString()
+    };
+    
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChat]: [...(prev[activeChat] || []), optimisticMessage]
+    }));
+    setMessage(""); 
+    setTimeout(scrollToBottom, 50);
+    
+    try {
+      await axios.post(`${apiBaseUrl}/chat/send-business`, {
+        businessSlug,
+        clientEmail: activeChat,
+        message: messageText
+      });
+      
+      await loadMessages(activeChat, true);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setChatMessages(prev => ({
+        ...prev,
+        [activeChat]: prev[activeChat].filter(msg => msg.id !== tempId)
+      }));
+      setMessage(messageText);
     }
+  };
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {

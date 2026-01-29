@@ -56,7 +56,13 @@ module.exports = (sequelize, DataTypes) => {
     // Google Calendar Integration
     googleCalendarEventId: {
       type: DataTypes.STRING,
-      allowNull: true
+      allowNull: true,
+      comment: 'Event ID in business calendar'
+    },
+    clientCalendarEventId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Event ID in client calendar (if client authorized)'
     },
     // Chat Integration
     hasChatHistory: {

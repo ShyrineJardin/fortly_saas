@@ -6,6 +6,7 @@ import { authAPI } from '../../utils/api';
 export default function BusinessHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isComingSoonOpen, setIsComingSoonOpen] = useState(false);
   const [businessData, setBusinessData] = useState<any>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -35,6 +36,23 @@ export default function BusinessHeader() {
     } catch (err) {
       console.error('Failed to copy:', err);
     }
+  };
+
+  const handleOpenBookings = () => {
+    // Open Google Calendar for the business email address
+    const businessEmail = businessData?.email;
+    if (businessEmail) {
+      // Format: https://calendar.google.com/calendar/u/0/r?cid=email@domain.com
+      const calendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(businessEmail)}`;
+      window.open(calendarUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      // Fallback to general Google Calendar if email is not available
+      window.open('https://calendar.google.com/calendar/u/0/r', '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleUnlockPro = () => {
+    setIsComingSoonOpen(true);
   };
 
   const handleDeleteAccount = async () => {
@@ -165,12 +183,18 @@ export default function BusinessHeader() {
                 </div>
 
                 <div className="flex items-center gap-6">
-                    <a href='/' className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium">
+                    <button 
+                      onClick={handleOpenBookings}
+                      className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium"
+                    >
                       Open Bookings
-                    </a>
-                    <a href='/' className="bg-green-50 text-gray-900 px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-opacity-80 transition-colors">
+                    </button>
+                    <button 
+                      onClick={handleUnlockPro}
+                      className="bg-green-50 text-gray-900 px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-opacity-80 transition-colors"
+                    >
                       Unlock Pro
-                    </a>
+                    </button>
                     <button 
                       onClick={() => setIsSettingsOpen(true)}
                       className="text-sm text-gray-600 hover:text-green-600 transition-colors"
@@ -217,9 +241,14 @@ export default function BusinessHeader() {
               <li className="px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer border-b border-gray-50">
                 <a href={`/${businessData.slug}`} target="_blank" rel="noopener noreferrer">Preview Website</a>
               </li>
-              <li className="px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"><a href="">Open Bookings</a></li>
+              <li className="px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">
+                <button onClick={handleOpenBookings} className="w-full text-center">Open Bookings</button>
+              </li>
               <li className="px-4 py-2">
-                <button className="w-full bg-green-50 text-gray-900 py-2 rounded-full text-sm font-bold">
+                <button 
+                  onClick={handleUnlockPro}
+                  className="w-full bg-green-50 text-gray-900 py-2 rounded-full text-sm font-bold"
+                >
                   Unlock Pro
                 </button>
               </li>
@@ -238,6 +267,35 @@ export default function BusinessHeader() {
                 <button onClick={handleSignOut} className="w-full text-center">Sign out</button>
               </li>
             </ul>
+          </div>
+        </>
+      )}
+
+      {/* Coming Soon Modal */}
+      {isComingSoonOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+            onClick={() => setIsComingSoonOpen(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-11/12 max-w-md bg-white rounded-2xl shadow-2xl z-50 p-8 text-center">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-softGreen rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-hoverGreen" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold mb-2">Coming Soon!</h2>
+              <p className="text-gray-600">
+                We're working hard to bring you Pro features. Stay tuned for updates!
+              </p>
+            </div>
+            <button 
+              onClick={() => setIsComingSoonOpen(false)}
+              className="w-full btn-primary"
+            >
+              Got it
+            </button>
           </div>
         </>
       )}
