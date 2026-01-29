@@ -553,7 +553,7 @@ export default function Confirmation() {
                                         handleCancelBooking();
                                     }
                                 }}
-                                className="btn-secondary text-red-600 border-red-600 hover:bg-red-50 w-full md:w-auto px-8"
+                                className="btn-secondary text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 w-full md:w-auto px-8"
                             >
                                 ❌ Cancel Appointment
                             </button>

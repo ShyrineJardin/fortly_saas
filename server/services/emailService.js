@@ -196,12 +196,13 @@ class EmailService {
               ` : ''}
 
               <div style="text-align: center; margin-top: 30px;">
-                <a href="${process.env.FRONTEND_URL}/business/dashboard" 
+                <a href="https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(businessEmail)}" 
                    style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  View in Dashboard
+                  View Schedules
                 </a>
               </div>
             </div>
+            
 
             <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
               <p style="margin: 0;">This is an automated notification from your booking system.</p>
