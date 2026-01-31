@@ -19,6 +19,7 @@ class EmailService {
     this.transporter = transporter;
   }
 
+
   /**
    * Send booking confirmation to client
    */
@@ -88,6 +89,13 @@ class EmailService {
               <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
                 <p style="margin: 0;"><strong>⏰ Reminders:</strong></p>
                 <p style="margin: 10px 0 0 0;">You'll receive email reminders 24 hours and 1 hour before your appointment.</p>
+              </div>
+
+              <div style="text-align: center; margin-top: 20px;">
+                <a href="https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(booking.clientEmail)}" 
+                   style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-bottom: 10px;">
+                  📅 View in Google Calendar
+                </a>
               </div>
 
               <div style="text-align: center; margin-top: 30px;">
@@ -195,15 +203,16 @@ class EmailService {
                 </div>
               ` : ''}
 
+
               <div style="text-align: center; margin-top: 30px;">
-                <a href="https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(businessEmail)}" 
-                   style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  View Schedules
+                <a href="https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(business.email)}" 
+                   style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-bottom: 15px;">
+                  📅 View in Google Calendar
                 </a>
               </div>
+
             </div>
             
-
             <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
               <p style="margin: 0;">This is an automated notification from your booking system.</p>
             </div>
@@ -217,6 +226,408 @@ class EmailService {
     } catch (error) {
       console.error('❌ Error sending business notification:', error);
       // Don't throw - this is secondary notification
+    }
+  }
+
+  /**
+   * Send cancellation request notification
+   */
+  async sendCancellationRequest(booking, business, service, requestedBy, reason) {
+    try {
+      const recipientEmail = requestedBy === 'client' ? business.email : booking.clientEmail;
+      const recipientName = requestedBy === 'client' ? business.businessName : booking.clientName;
+      const requesterName = requestedBy === 'client' ? booking.clientName : business.businessName;
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: recipientEmail,
+        subject: `Cancellation Request - ${service.name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #f59e0b; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">⚠️ Cancellation Request</h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <p style="font-size: 16px;">Hi ${recipientName},</p>
+              
+              <p><strong>${requesterName}</strong> has requested to cancel this booking:</p>
+              
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: #f59e0b; margin-top: 0;">📋 Booking Details</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Service:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Date:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Time:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingTime}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;"><strong>Booking ID:</strong></td>
+                    <td style="padding: 8px 0;"><code>${booking.id}</code></td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>📝 Cancellation Reason:</strong>
+                <p style="margin: 10px 0 0 0;">${reason}</p>
+              </div>
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.FRONTEND_URL}/booking/${booking.id}/respond-cancellation?approve=true" 
+                   style="background-color: #10b981; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 0 10px;">
+                  Approve Cancellation
+                </a>
+                <a href="${process.env.FRONTEND_URL}/booking/${booking.id}/respond-cancellation?approve=false" 
+                   style="background-color: #ef4444; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 0 10px;">
+                  Reject Request
+                </a>
+              </div>
+
+              <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+                <p style="margin: 0;"><strong>⏰ Important:</strong></p>
+                <p style="margin: 10px 0 0 0;">Please respond to this request as soon as possible.</p>
+              </div>
+            </div>
+
+            <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">This is an automated notification from your booking system.</p>
+            </div>
+          </div>
+        `
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      console.log('✅ Cancellation request email sent to:', recipientEmail);
+
+    } catch (error) {
+      console.error('❌ Error sending cancellation request email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send cancellation response notification
+   */
+  async sendCancellationResponse(booking, business, service, cancellationRequest, response, respondedBy) {
+    try {
+      const recipientEmail = cancellationRequest.requestedBy === 'client' ? booking.clientEmail : business.email;
+      const recipientName = cancellationRequest.requestedBy === 'client' ? booking.clientName : business.businessName;
+      const responderName = respondedBy === 'client' ? booking.clientName : business.businessName;
+
+      const isApproved = response === 'approved';
+      const statusColor = isApproved ? '#10b981' : '#ef4444';
+      const statusIcon = isApproved ? '✅' : '❌';
+      const statusText = isApproved ? 'Approved' : 'Rejected';
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: recipientEmail,
+        subject: `Cancellation ${statusText} - ${service.name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: ${statusColor}; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">${statusIcon} Cancellation ${statusText}</h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <p style="font-size: 16px;">Hi ${recipientName},</p>
+              
+              <p><strong>${responderName}</strong> has <strong>${statusText.toLowerCase()}</strong> your cancellation request.</p>
+              
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: ${statusColor}; margin-top: 0;">📋 Booking Details</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Service:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Date:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Time:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingTime}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Status:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                      <span style="background-color: ${isApproved ? '#fee2e2' : '#fef3c7'}; color: ${isApproved ? '#dc2626' : '#92400e'}; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                        ${isApproved ? 'CANCELLED' : booking.status.toUpperCase()}
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="background-color: #e0f2fe; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>📝 Original Reason:</strong>
+                <p style="margin: 10px 0 0 0;">${cancellationRequest.reason}</p>
+              </div>
+
+              ${isApproved ? `
+                <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>✅ Booking Cancelled</strong></p>
+                  <p style="margin: 10px 0 0 0;">This appointment has been removed from both calendars.</p>
+                </div>
+              ` : `
+                <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>📅 Booking Remains Active</strong></p>
+                  <p style="margin: 10px 0 0 0;">Your appointment is still scheduled as planned.</p>
+                </div>
+              `}
+
+              <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #6b7280; font-size: 14px;">
+                  Questions? Contact ${respondedBy === 'business' ? business.email : booking.clientEmail}
+                </p>
+              </div>
+            </div>
+
+            <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} ${business.businessName}</p>
+            </div>
+          </div>
+        `
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      console.log('✅ Cancellation response email sent to:', recipientEmail);
+
+      // Also send confirmation to the person who responded
+      if (isApproved) {
+        const confirmerEmail = respondedBy === 'client' ? booking.clientEmail : business.email;
+        const confirmerMailOptions = {
+          from: process.env.EMAIL_USER,
+          to: confirmerEmail,
+          subject: `You Cancelled Booking - ${service.name}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background-color: #ef4444; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0;">✅ Cancellation Confirmed</h1>
+              </div>
+              
+              <div style="padding: 30px; background-color: #f9fafb;">
+                <p style="font-size: 16px;">Hi ${responderName},</p>
+                
+                <p>You have successfully cancelled this booking:</p>
+                
+                <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Service:</strong></td>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.name}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Date:</strong></td>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0;"><strong>Time:</strong></td>
+                      <td style="padding: 8px 0;">${booking.bookingTime}</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0;">The appointment has been removed from all calendars. ${cancellationRequest.requestedBy === 'client' ? booking.clientName : business.businessName} has been notified.</p>
+                </div>
+              </div>
+
+              <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+                <p style="margin: 0;">© ${new Date().getFullYear()} ${business.businessName}</p>
+              </div>
+            </div>
+          `
+        };
+
+        await this.transporter.sendMail(confirmerMailOptions);
+        console.log('✅ Cancellation confirmation sent to:', confirmerEmail);
+      }
+
+    } catch (error) {
+      console.error('❌ Error sending cancellation response email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send cancellation notification to both parties (SIMPLIFIED)
+   */
+  async sendCancellationNotification(booking, business, service, reason, cancelledBy) {
+    try {
+      const canceller = cancelledBy === 'client' ? booking.clientName : business.businessName;
+      
+      // ✅ Email to CLIENT
+      const clientMailOptions = {
+        from: process.env.EMAIL_USER,
+        to: booking.clientEmail,
+        subject: `Appointment Cancelled - ${business.businessName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #ef4444; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">❌ Appointment Cancelled</h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <p style="font-size: 16px;">Hi ${booking.clientName},</p>
+              
+              <p>${cancelledBy === 'client' ? 'You have' : `${business.businessName} has`} cancelled the following appointment:</p>
+              
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: #ef4444; margin-top: 0;">📋 Cancelled Appointment</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Service:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Date:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Time:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingTime}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;"><strong>Booking ID:</strong></td>
+                    <td style="padding: 8px 0;"><code>${booking.id}</code></td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>📝 Cancellation Reason:</strong>
+                <p style="margin: 10px 0 0 0;">${reason}</p>
+              </div>
+
+              <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+                <p style="margin: 0;"><strong>✅ Calendar Updated</strong></p>
+                <p style="margin: 10px 0 0 0;">This appointment has been removed from ${cancelledBy === 'client' ? 'your calendar and the business calendar' : 'both calendars'}.</p>
+              </div>
+
+              ${cancelledBy === 'business' ? `
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/${business.slug}/services" 
+                   style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Book Another Appointment
+                </a>
+              </div>
+              ` : ''}
+
+              <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #6b7280; font-size: 14px;">
+                  Questions? Contact us at ${business.email || business.phone}
+                </p>
+              </div>
+            </div>
+
+            <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} ${business.businessName}</p>
+            </div>
+          </div>
+        `
+      };
+
+      await this.transporter.sendMail(clientMailOptions);
+      console.log('✅ Cancellation email sent to client:', booking.clientEmail);
+
+      // ✅ Email to BUSINESS
+      const businessMailOptions = {
+        from: process.env.EMAIL_USER,
+        to: business.email,
+        subject: `Appointment Cancelled - ${booking.clientName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #ef4444; padding: 20px; text-align: center;">
+              <h1 style="color: white; margin: 0;">❌ Appointment Cancelled</h1>
+            </div>
+            
+            <div style="padding: 30px; background-color: #f9fafb;">
+              <p style="font-size: 16px;">Hi ${business.businessName},</p>
+              
+              <p>${cancelledBy === 'client' ? `${booking.clientName} has` : 'You have'} cancelled the following appointment:</p>
+              
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: #ef4444; margin-top: 0;">👤 Client Information</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Name:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.clientName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Email:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.clientEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;"><strong>Phone:</strong></td>
+                    <td style="padding: 8px 0;">${booking.clientPhone || 'Not provided'}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h2 style="color: #ef4444; margin-top: 0;">📅 Appointment Details</h2>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Service:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${service.name}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Date:</strong></td>
+                    <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">${booking.bookingDate}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0;"><strong>Time:</strong></td>
+                    <td style="padding: 8px 0;">${booking.bookingTime}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <strong>📝 Cancellation Reason:</strong>
+                <p style="margin: 10px 0 0 0;">${reason}</p>
+              </div>
+
+              <div style="background-color: #fee2e2; padding: 15px; border-radius: 8px; border-left: 4px solid #ef4444; margin: 20px 0;">
+                <p style="margin: 0;"><strong>✅ Calendar Updated</strong></p>
+                <p style="margin: 10px 0 0 0;">This appointment has been removed from your calendar.</p>
+              </div>
+
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(business.email)}" 
+                   style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  📅 View Your Calendar
+                </a>
+              </div>
+            </div>
+
+            <div style="background-color: #1f2937; padding: 20px; text-align: center; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">This is an automated notification from your booking system.</p>
+            </div>
+          </div>
+        `
+      };
+
+      await this.transporter.sendMail(businessMailOptions);
+      console.log('✅ Cancellation email sent to business:', business.email);
+
+    } catch (error) {
+      console.error('❌ Error sending cancellation emails:', error);
+      throw error;
     }
   }
 
@@ -390,7 +801,7 @@ const sendBusinessNotification = async (businessEmail, businessName, clientName,
               ${message.length > 200 ? message.substring(0, 200) + '...' : message}
             </div>
             <p style="text-align: center;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/business/dashboard" class="button">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/business/" class="button">
                 View & Reply
               </a>
             </p>

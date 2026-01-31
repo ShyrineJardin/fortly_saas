@@ -29,7 +29,7 @@ router.post('/', async (req, res) => {
       bookingTime, 
       notes,
       clientAddress,
-      syncToClientCalendar // NEW: Flag to indicate if client wants calendar sync
+      syncToClientCalendar
     } = req.body;
 
     console.log('📝 Creating booking:', { 
@@ -70,20 +70,28 @@ router.post('/', async (req, res) => {
       include: [{ model: db.Service, as: 'Service' }]
     });
 
-    // Validate that the selected time slot is available
-    const isAvailable = await availabilityService.validateBookingSlot(
+    // ✅ FIX: Validate using the same method that generates slots
+    const slotsData = await availabilityService.getAvailableSlotsWithStatus(
       business,
       service,
       bookingDate,
-      bookingTime,
       existingBookings
     );
 
+    // Check if the requested time is in available slots
+    const isAvailable = slotsData.availableSlots.some(slot => slot.time === bookingTime);
+
     if (!isAvailable) {
+      console.log('❌ Time slot not available:', {
+        requestedTime: bookingTime,
+        availableSlots: slotsData.availableSlots.map(s => s.time)
+      });
       return res.status(400).json({ 
         message: 'This time slot is no longer available. Please select another time.' 
       });
     }
+
+    console.log('✅ Time slot validated:', bookingTime);
 
     // Create booking
     const booking = await db.Booking.create({
@@ -137,7 +145,6 @@ router.post('/', async (req, res) => {
       if (business.googleCalendarTokens) {
         console.log('📅 Creating calendar events...');
         
-        // Check if client has authorized calendar
         let clientTokens = null;
         let clientToken = null;
 
@@ -151,7 +158,6 @@ router.post('/', async (req, res) => {
           }
         }
 
-        // Create events (business calendar always, client calendar if authorized)
         const eventIds = await googleCalendarService.createBookingEvent(
           booking,
           business,
@@ -161,7 +167,6 @@ router.post('/', async (req, res) => {
           chatMessages
         );
         
-        // Save calendar event IDs
         await booking.update({ 
           googleCalendarEventId: eventIds.businessEventId,
           clientCalendarEventId: eventIds.clientEventId
@@ -172,7 +177,6 @@ router.post('/', async (req, res) => {
 
         console.log('✅ Calendar sync status:', calendarSyncStatus);
 
-        // If client wants sync but hasn't authorized, provide auth URL
         if (syncToClientCalendar && !clientTokens) {
           const authUrl = googleCalendarService.getAuthUrl(
             clientEmail,
@@ -193,17 +197,13 @@ router.post('/', async (req, res) => {
       console.error('⚠️ Calendar sync failed (non-blocking):', calendarError.message);
     }
 
-    // Send email notifications (non-blocking)
+    // ✅ FIX: Send email notifications (non-blocking)
     try {
       const emailSvc = getEmailService(req);
-      await emailSvc.sendBookingConfirmation(
-        booking,
-        business,
-        service
-      );
-      console.log('📧 Confirmation email sent to:', booking.clientEmail);
+      await emailSvc.sendBookingConfirmation(booking, business, service);
+      console.log('✅ Confirmation emails sent successfully');
     } catch (emailError) {
-      console.error('⚠️ Email sending failed (non-blocking):', emailError.message);
+      console.error('❌ Email sending failed (non-blocking):', emailError.message);
     }
 
     res.status(201).json({ 
@@ -243,7 +243,6 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
 
     console.log('📝 Booking status updated:', { id: booking.id, oldStatus, newStatus: status });
 
-    // Get chat messages for calendar update
     const chatMessages = await db.Message.findAll({
       where: {
         businessId: req.business.id,
@@ -253,13 +252,11 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
       limit: 20
     });
 
-    // Update Google Calendar events if connected
     try {
       const business = await db.Business.findByPk(req.business.id);
       
       if (business.googleCalendarTokens) {
         if (status === 'cancelled') {
-          // Delete events from BOTH calendars
           if (booking.googleCalendarEventId) {
             await googleCalendarService.deleteBookingEvent(
               booking.googleCalendarEventId,
@@ -268,7 +265,6 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
             console.log('📅 Business calendar event deleted');
           }
 
-          // Delete from client calendar too
           if (booking.clientCalendarEventId) {
             const clientToken = await db.ClientCalendarToken.findOne({
               where: { clientEmail: booking.clientEmail, isConnected: true }
@@ -284,7 +280,6 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
           }
 
         } else {
-          // Update events in BOTH calendars
           if (booking.googleCalendarEventId) {
             await googleCalendarService.updateBookingEvent(
               booking.googleCalendarEventId,
@@ -320,7 +315,6 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
       console.error('⚠️ Calendar update failed:', calendarError.message);
     }
 
-    // Send status update email
     try {
       const emailSvc = getEmailService(req);
       await emailSvc.sendBookingStatusUpdate(
@@ -357,7 +351,7 @@ router.put('/:id/reschedule', async (req, res) => {
       },
       include: [
         { model: db.Service, as: 'Service' },
-        { model: db.Business, as: 'Business' }
+        { model: db.Business, as: 'Business', include: [{ model: db.Schedule, as: 'schedules' }] }
       ]
     });
 
@@ -371,24 +365,24 @@ router.put('/:id/reschedule', async (req, res) => {
       });
     }
 
-    // Validate new time slot
     const existingBookings = await db.Booking.findAll({
       where: { 
         businessId: booking.businessId,
         bookingDate,
         status: ['pending', 'confirmed'],
-        id: { [db.Sequelize.Op.ne]: booking.id } // Exclude current booking
+        id: { [db.Sequelize.Op.ne]: booking.id }
       },
       include: [{ model: db.Service, as: 'Service' }]
     });
 
-    const isAvailable = await availabilityService.validateBookingSlot(
+    const slotsData = await availabilityService.getAvailableSlotsWithStatus(
       booking.Business,
       booking.Service,
       bookingDate,
-      bookingTime,
       existingBookings
     );
+
+    const isAvailable = slotsData.availableSlots.some(slot => slot.time === bookingTime);
 
     if (!isAvailable) {
       return res.status(400).json({ 
@@ -396,10 +390,8 @@ router.put('/:id/reschedule', async (req, res) => {
       });
     }
 
-    // Update booking
     await booking.update({ bookingDate, bookingTime });
 
-    // Get chat messages
     const chatMessages = await db.Message.findAll({
       where: {
         businessId: booking.businessId,
@@ -409,7 +401,6 @@ router.put('/:id/reschedule', async (req, res) => {
       limit: 20
     });
 
-    // Update calendar events
     try {
       if (booking.Business.googleCalendarTokens && booking.googleCalendarEventId) {
         await googleCalendarService.updateBookingEvent(
@@ -454,10 +445,10 @@ router.put('/:id/reschedule', async (req, res) => {
   }
 });
 
-// ==================== CANCEL BOOKING (CLIENT) ====================
+// ==================== CANCEL BOOKING (SIMPLIFIED - IMMEDIATE) ====================
 router.put('/:id/cancel', async (req, res) => {
   try {
-    const { clientEmail } = req.body;
+    const { clientEmail, reason, cancelledBy } = req.body;
 
     const booking = await db.Booking.findOne({
       where: { 
@@ -478,16 +469,28 @@ router.put('/:id/cancel', async (req, res) => {
       return res.status(400).json({ message: 'Booking is already cancelled' });
     }
 
-    await booking.update({ status: 'cancelled', cancelledBy: 'client' });
+    if (booking.status === 'completed') {
+      return res.status(400).json({ message: 'Cannot cancel completed bookings' });
+    }
 
-    // Delete from BOTH calendars
+    // ✅ Update booking - immediate cancellation
+    await booking.update({ 
+      status: 'cancelled',
+      cancelledBy: cancelledBy || 'client',
+      cancellationReason: reason,
+      cancelledAt: new Date()
+    });
+
+    console.log('✅ Booking cancelled:', booking.id);
+
+    // Delete calendar events
     try {
       if (booking.Business.googleCalendarTokens && booking.googleCalendarEventId) {
         await googleCalendarService.deleteBookingEvent(
           booking.googleCalendarEventId,
           JSON.parse(booking.Business.googleCalendarTokens)
         );
-        console.log('📅 Business calendar event deleted after cancellation');
+        console.log('📅 Business calendar event deleted');
       }
 
       if (booking.clientCalendarEventId) {
@@ -500,15 +503,30 @@ router.put('/:id/cancel', async (req, res) => {
             booking.clientCalendarEventId,
             JSON.parse(clientToken.googleCalendarTokens)
           );
-          console.log('📅 Client calendar event deleted after cancellation');
+          console.log('📅 Client calendar event deleted');
         }
       }
     } catch (calendarError) {
       console.error('⚠️ Calendar delete failed:', calendarError.message);
     }
 
+    // Send cancellation emails to BOTH parties
+    try {
+      const emailSvc = getEmailService(req);
+      await emailSvc.sendCancellationNotification(
+        booking,
+        booking.Business,
+        booking.Service,
+        reason,
+        cancelledBy || 'client'
+      );
+      console.log('✅ Cancellation emails sent to both parties');
+    } catch (emailError) {
+      console.error('⚠️ Email sending failed:', emailError.message);
+    }
+
     res.json({ 
-      message: 'Booking cancelled successfully',
+      message: 'Booking cancelled successfully. Both parties have been notified.',
       booking 
     });
   } catch (error) {
@@ -518,7 +536,6 @@ router.put('/:id/cancel', async (req, res) => {
 });
 
 // ==================== GET AVAILABLE SLOTS ====================
-// (Keep your existing implementation from the original file)
 router.get('/available-slots/:businessSlug/:date', async (req, res) => {
   try {
     const { businessSlug, date } = req.params;
@@ -581,7 +598,6 @@ router.get('/available-slots/:businessSlug/:date', async (req, res) => {
 });
 
 // ==================== GET BUSINESS BOOKINGS ====================
-// (Keep remaining routes from your original file)
 router.get('/my-bookings', authMiddleware, async (req, res) => {
   try {
     const { status, date, startDate, endDate } = req.query;
@@ -724,13 +740,14 @@ router.post('/check-availability', async (req, res) => {
       include: [{ model: db.Service, as: 'Service' }]
     });
 
-    const isAvailable = await availabilityService.validateBookingSlot(
+    const slotsData = await availabilityService.getAvailableSlotsWithStatus(
       business,
       service,
       bookingDate,
-      bookingTime,
       existingBookings
     );
+
+    const isAvailable = slotsData.availableSlots.some(slot => slot.time === bookingTime);
 
     res.json({ 
       available: isAvailable,

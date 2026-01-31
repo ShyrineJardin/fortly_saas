@@ -63,21 +63,18 @@ export const businessAPI = {
   syncBookings: () => api.post('/google-calendar/sync-bookings')
 };
 
-// ==================== CLIENT CALENDAR API (NEW) ====================
+// ==================== CLIENT CALENDAR API ====================
 export const clientCalendarAPI = {
-  // Get auth URL for client calendar connection
   getAuthUrl: (clientEmail, bookingId = null) => 
     api.get('/google-calendar/connect-client', { 
       params: { clientEmail, bookingId } 
     }),
   
-  // Check if client has connected calendar
   checkStatus: (clientEmail) => 
     api.get('/google-calendar/status-client', { 
       params: { clientEmail } 
     }),
   
-  // Disconnect client calendar
   disconnect: (clientEmail) => 
     api.delete('/google-calendar/disconnect-client', { 
       data: { clientEmail } 
@@ -114,13 +111,15 @@ export const galleryAPI = {
   delete: (id) => api.delete(`/gallery/${id}`)
 };
 
-// ==================== BOOKINGS API (UPDATED) ====================
+// ==================== BOOKINGS API (SIMPLIFIED) ====================
 export const bookingsAPI = {
   // Create a new booking with optional calendar sync
   create: (data) => api.post('/bookings', data),
   
-  // Reschedule booking (NEW)
+  // Reschedule booking
   reschedule: (id, data) => api.put(`/bookings/${id}/reschedule`, data),
+  
+  cancel: (id, data) => api.put(`/bookings/${id}/cancel`, data),
   
   getMyBookings: (params) => api.get('/bookings/my-bookings', { params }),
   getById: (id) => api.get(`/bookings/${id}`),
@@ -128,8 +127,6 @@ export const bookingsAPI = {
   getAvailableSlots: (businessSlug, date, params) => 
     api.get(`/bookings/available-slots/${businessSlug}/${date}`, { params }),
   checkAvailability: (data) => api.post('/bookings/check-availability', data),
-  cancelBooking: (id, clientEmail) => 
-    api.put(`/bookings/${id}/cancel`, { clientEmail }),
   getClientBookings: (clientEmail, params) => 
     api.get(`/bookings/client/${clientEmail}`, { params })
 };

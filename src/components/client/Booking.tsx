@@ -19,7 +19,9 @@ export default function BookingPage() {
   const [takenTimeSlots, setTakenTimeSlots] = useState<any[]>([]);
   const [syncToCalendar, setSyncToCalendar] = useState(false);
 
-  
+  // ✅ NEW: Submitting state for clean loading screen
+  const [submitting, setSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     fullName: "",
     emailAddress: "",
@@ -29,7 +31,6 @@ export default function BookingPage() {
   });
   const [agreeToPolicy, setAgreeToPolicy] = useState(false);
 
-  // Business data from API
   const [businessData, setBusinessData] = useState<any>(null);
   const [bookingPolicy, setBookingPolicy] = useState({
     title: "Booking Policy",
@@ -37,7 +38,6 @@ export default function BookingPage() {
     policyList: [] as string[]
   });
 
-  // Calendar state
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [minAdvanceDays, setMinAdvanceDays] = useState(0);
 
@@ -58,12 +58,6 @@ export default function BookingPage() {
       setLoading(true);
       const response = await authAPI.getMe();
       const business = response.data.business;
-      
-      console.log('📊 Loaded Business Data:', {
-        schedules: business.schedules,
-        bufferTime: business.bufferTime,
-        timezone: business.timezone
-      });
       
       setBusinessData(business);
       setBookingPolicy({
@@ -89,20 +83,11 @@ export default function BookingPage() {
       const day = String(date.getDate()).padStart(2, '0');
       const formattedDate = `${year}-${month}-${day}`;
 
-      console.log('🔍 Fetching slots for:', { 
-        date: formattedDate, 
-        dayOfWeek: date.toLocaleDateString('en-US', { weekday: 'long' }),
-        serviceId: selectedService.id 
-      });
-
-      // ✅ ADD THIS - The missing API call!
       const response = await bookingsAPI.getAvailableSlots(
         businessSlug,
         formattedDate,
         { serviceId: selectedService.id }
       );
-
-      console.log('✅ Received slots:', response.data);
 
       setAvailableTimeSlots(response.data.availableSlots || []);
       setTakenTimeSlots(response.data.takenSlots || []);
@@ -126,16 +111,13 @@ export default function BookingPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Can't select past dates
     if (date < today) return false;
     
-    // Check minimum advance booking requirement
     const minDate = new Date(today);
     minDate.setDate(today.getDate() + minAdvanceDays);
     
     if (date < minDate) return false;
     
-    // Check if business is open on this day
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     const daySchedule = businessData?.schedules?.find((s: any) => s.dayOfWeek === dayOfWeek);
     
@@ -162,20 +144,16 @@ export default function BookingPage() {
       return;
     }
 
-    
-
     try {
-      setLoading(true);
+      // ✅ Set submitting state - this will hide sidebar
+      setSubmitting(true);
 
-      // Find the selected time slot object
       const selectedSlot = availableTimeSlots.find(slot => slot.display === selectedTime);
       const year = selectedDate.getFullYear();
       const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
       const day = String(selectedDate.getDate()).padStart(2, '0');
       const formattedBookingDate = `${year}-${month}-${day}`;
 
-      
-      // Format booking data
       const bookingData = {
         businessSlug,
         serviceId: selectedService.id,
@@ -195,7 +173,6 @@ export default function BookingPage() {
 
       console.log('✅ Booking created:', response.data);
 
-      // Navigate to confirmation with booking details
       navigate(`/${businessSlug}/confirmation`, { 
         state: { 
           selectedService: selectedService,
@@ -219,7 +196,7 @@ export default function BookingPage() {
     } catch (err: any) {
       console.error('❌ Booking error:', err);
       setError(err.response?.data?.message || 'Failed to create booking');
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -227,7 +204,6 @@ export default function BookingPage() {
     navigate(`/${businessSlug}/services`);
   };
 
-  // Calendar navigation
   const previousMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
     setSelectedDate(null);
@@ -240,7 +216,6 @@ export default function BookingPage() {
     setSelectedTime(null);
   };
 
-  // Generate calendar days
   const getDaysInMonth = () => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -249,12 +224,10 @@ export default function BookingPage() {
     
     const days: (number | null)[] = [];
     
-    // Add empty cells for days before month starts
     for (let i = 0; i < firstDay; i++) {
       days.push(null);
     }
     
-    // Add days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
@@ -262,7 +235,6 @@ export default function BookingPage() {
     return days;
   };
 
-  // Convert 24hr to 12hr format for display
   const formatTime = (time: string) => {
     if (!time) return '';
     const [hours, minutes] = time.split(':');
@@ -274,6 +246,19 @@ export default function BookingPage() {
 
   if (!selectedService) {
     return <Navigate to={`/${businessSlug}/services`} replace />;
+  }
+
+  // Clean loading screen during submission of booking
+  if (submitting) {
+    return (
+      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primaryGreen border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Creating your booking...</h3>
+          <p className="text-sm text-gray-500">Please wait while we confirm your appointment</p>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -291,7 +276,6 @@ export default function BookingPage() {
 
   return (
     <div>
-      {/* Error Message */}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2">
           <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -309,7 +293,6 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* Header */}
       <div className="mb-6 border-b border-gray-100 w-full pb-4">
         <button 
           onClick={handleBackClick}
@@ -320,14 +303,12 @@ export default function BookingPage() {
         </button>
       </div>
 
-      {/* Booking Policy Section */}
       <BookingPolicy 
         title={bookingPolicy.title}
         description={bookingPolicy.description}
         policyList={bookingPolicy.policyList}
       />
 
-      {/* Service Card */}
       <ServiceCard 
         id={selectedService.id}
         title={selectedService.title}
@@ -338,19 +319,15 @@ export default function BookingPage() {
         showArrow={false}
       />
 
-      {/* Date and Time Selection */}
       <div className="mb-6"> 
         <h2 className="font-semibold mb-4 lg:text-base text-sm">Select date and time</h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Calendar Section */}
           <div className="bg-white border border-gray-200 rounded-xl p-6">
-            {/* Month/Year Header with Navigation */}
             <div className="flex items-center justify-between mb-6">
               <button 
                 onClick={previousMonth} 
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
-                aria-label="Previous month"
               >
                 {FaChevronLeft ({className:"w-5 h-5 text-gray-600" })}
               </button>
@@ -362,13 +339,11 @@ export default function BookingPage() {
               <button 
                 onClick={nextMonth} 
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
-                aria-label="Next month"
               >
                 {FaChevronRight ({className:"w-5 h-5 text-gray-600" })}
               </button>
             </div>
 
-            {/* Day Headers */}
             <div className="grid grid-cols-7 gap-2 mb-3">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                 <div key={day} className="text-center text-xs font-semibold text-gray-500 py-2">
@@ -377,7 +352,6 @@ export default function BookingPage() {
               ))}
             </div>
 
-            {/* Calendar Days Grid */}
             <div className="grid grid-cols-7 gap-2">
               {getDaysInMonth().map((day, index) => {
                 if (day === null) {
@@ -413,7 +387,6 @@ export default function BookingPage() {
               })}
             </div>
 
-            {/* Info Footer */}
             <div className="mt-6 pt-4 border-t border-gray-200 space-y-2">
               <p className="text-xs text-gray-500 text-center">
                 🕐 Timezone: {businessData?.timezone || 'UTC'}
@@ -429,9 +402,7 @@ export default function BookingPage() {
             </div>
           </div>
 
-          {/* Time slots - Available + Taken */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-96 overflow-y-auto p-4">
-            {/* Available Slots */}
             {availableTimeSlots.map((slot, index) => (
               <button
                 key={`available-${index}`}
@@ -449,7 +420,6 @@ export default function BookingPage() {
               </button>
             ))}
 
-            {/* Taken Slots - Grayed Out */}
             {takenTimeSlots.map((slot, index) => (
               <div
                 key={`taken-${index}`}
@@ -466,7 +436,6 @@ export default function BookingPage() {
         </div>
       </div>
 
-      {/* Contact Form */}
       <div className="mb-6 bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="font-semibold mb-4 lg:text-base text-sm">Your Information</h2>
         
@@ -575,17 +544,10 @@ export default function BookingPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={!selectedDate || !selectedTime || !agreeToPolicy || !syncToCalendar || !formData.fullName || !formData.emailAddress || !formData.mobileNumber || loading}
+            disabled={!selectedDate || !selectedTime || !agreeToPolicy || !formData.fullName || !formData.emailAddress || !formData.mobileNumber}
             className="btn-primary w-full md:w-auto px-12 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
           >
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Processing...
-              </>
-            ) : (
-              'Confirm Booking'
-            )}
+            Confirm Booking
           </button>
         </div>
       </div>

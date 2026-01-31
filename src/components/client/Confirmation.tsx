@@ -3,6 +3,7 @@ import { useLocation, Navigate, useParams } from "react-router-dom";
 import { FaFacebook, FaXTwitter, FaInstagram, FaLinkedin, FaCalendar, FaCheck } from 'react-icons/fa6'
 import { BsFillTelephoneFill } from "react-icons/bs";
 import { MdEmail } from "react-icons/md";
+import { IoClose } from "react-icons/io5";
 import ServiceCard from "../shared/ServiceCard";
 import Footer from "../client/Footer";
 import { businessAPI, clientCalendarAPI, bookingsAPI } from '../../utils/api';
@@ -18,6 +19,11 @@ export default function Confirmation() {
     const [showCalendarOption, setShowCalendarOption] = useState(false);
     const [connectingCalendar, setConnectingCalendar] = useState(false);
     
+    // Cancellation modal states
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelling, setCancelling] = useState(false);
+    
     // Catch the service data passed from the Booking page
     const selectedService = location.state?.selectedService;
     const bookingDate = location.state?.bookingDate;
@@ -31,26 +37,21 @@ export default function Confirmation() {
     const hasChatHistory = location.state?.hasChatHistory;
     const chatMessageCount = location.state?.chatMessageCount;
 
-    // Fetch business data from API (same as ClientSidebar)
     useEffect(() => {
         fetchBusinessData();
     }, [businessSlug]);
 
-    // Check calendar sync status
     useEffect(() => {
-        // Check if calendar was just connected via URL params
         const params = new URLSearchParams(window.location.search);
         if (params.get('calendar') === 'connected') {
             setCalendarConnected(true);
             setShowCalendarOption(false);
         }
 
-        // Show calendar option if client needs to authorize
         if (calendarSync?.requiresClientAuth && calendarSync?.clientAuthUrl) {
             setShowCalendarOption(true);
         }
 
-        // Check if client already has calendar connected
         if (bookingData?.clientEmail) {
             checkCalendarStatus();
         }
@@ -68,7 +69,6 @@ export default function Confirmation() {
         }
     };
 
-    // Check if client has calendar connected
     const checkCalendarStatus = async () => {
         try {
             const response = await clientCalendarAPI.checkStatus(bookingData.clientEmail);
@@ -81,24 +81,20 @@ export default function Confirmation() {
         }
     };
 
-    // Handle calendar connection
     const handleConnectCalendar = async () => {
         try {
             setConnectingCalendar(true);
             
-            // If we already have the auth URL from booking
             if (calendarSync?.clientAuthUrl) {
                 window.location.href = calendarSync.clientAuthUrl;
                 return;
             }
 
-            // Otherwise, get a new auth URL
             const response = await clientCalendarAPI.getAuthUrl(
                 bookingData.clientEmail,
                 bookingData.id
             );
 
-            // Redirect to Google OAuth
             window.location.href = response.data.authUrl;
         } catch (error) {
             console.error('Error getting auth URL:', error);
@@ -107,22 +103,41 @@ export default function Confirmation() {
         }
     };
 
-    const formatDate = (dateString: string | undefined) => {
-        console.log('🔄 Formatting date:', dateString);
-        
-        if (!dateString) {
-            console.warn('⚠️ No date string provided');
-            return 'Date not set';
+    // Handle cancellation with reason
+    const handleCancelBooking = async () => {
+        if (!cancelReason.trim()) {
+            alert('Please provide a reason for cancellation');
+            return;
         }
+
+        try {
+            setCancelling(true);
+
+            await bookingsAPI.cancel(bookingData.id, {
+                clientEmail: bookingData.clientEmail,
+                reason: cancelReason,
+                cancelledBy: 'client'
+            });
+
+            alert('✅ Booking cancelled successfully. Both you and the business have been notified.');
+            
+            // Redirect to services page
+            window.location.href = `/${businessSlug}/services`;
+
+        } catch (error: any) {
+            console.error('Error cancelling booking:', error);
+            alert(error.response?.data?.message || 'Failed to cancel booking. Please try again.');
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const formatDate = (dateString: string | undefined) => {
+        if (!dateString) return 'Date not set';
         
         try {
             const date = new Date(dateString);
-            
-            // Check if date is valid
-            if (isNaN(date.getTime())) {
-                console.error('❌ Invalid date:', dateString);
-                return dateString; 
-            }
+            if (isNaN(date.getTime())) return dateString;
             
             return date.toLocaleDateString('en-US', {
                 weekday: 'long',
@@ -131,49 +146,33 @@ export default function Confirmation() {
                 day: 'numeric'
             });
         } catch (error) {
-            console.error('❌ Error formatting date:', error);
             return dateString;
         }
     };
 
     const formatTime = (timeString: string | undefined) => {
-        console.log('🔄 Formatting time:', timeString);
-        
-        if (!timeString) {
-            console.warn('⚠️ No time string provided');
-            return 'Time not set';
-        }
+        if (!timeString) return 'Time not set';
         
         try {
             const timeParts = timeString.split(':');
-            if (timeParts.length < 2) {
-                console.error('❌ Invalid time format:', timeString);
-                return timeString;
-            }
+            if (timeParts.length < 2) return timeString;
             
             const hours = parseInt(timeParts[0], 10);
             const minutes = parseInt(timeParts[1], 10);
             
-            if (isNaN(hours) || isNaN(minutes)) {
-                console.error('❌ Invalid time values:', timeString);
-                return timeString;
-            }
+            if (isNaN(hours) || isNaN(minutes)) return timeString;
             
             const ampm = hours >= 12 ? 'PM' : 'AM';
             const displayHour = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
             
             return `${displayHour}:${String(minutes).padStart(2, '0')} ${ampm}`;
         } catch (error) {
-            console.error('❌ Error formatting time:', error);
             return timeString;
         }
     };
 
     const calculateEndTime = (startTime: string | undefined, duration: string | undefined) => {
-        if (!startTime || !duration) {
-            console.warn('⚠️ Missing startTime or duration');
-            return '';
-        }
+        if (!startTime || !duration) return '';
         
         try {
             const timeParts = startTime.split(':');
@@ -181,16 +180,12 @@ export default function Confirmation() {
             
             const hours = parseInt(timeParts[0], 10);
             const minutes = parseInt(timeParts[1], 10);
-            
             if (isNaN(hours) || isNaN(minutes)) return '';
             
             let totalMinutes = hours * 60 + minutes;
             
             const durationMatch = duration.match(/^(\d+(?:\.\d+)?)\s*(\w+)$/);
-            if (!durationMatch) {
-                console.warn('⚠️ Could not parse duration:', duration);
-                return '';
-            }
+            if (!durationMatch) return '';
 
             const value = parseFloat(durationMatch[1]);
             const unit = durationMatch[2].toLowerCase();
@@ -211,35 +206,27 @@ export default function Confirmation() {
                     break;
                 case 'day':
                 case 'days':
-                    console.log('📅 Multi-day service detected');
                     return '';
                 default:
                     durationMinutes = 60;
             }
 
-            if (durationMinutes >= 1440) { 
-                console.log('📅 Duration is 24+ hours, not showing end time');
-                return '';
-            }
+            if (durationMinutes >= 1440) return '';
 
-            // Calculate end time
             totalMinutes += durationMinutes;
             const endHours = Math.floor(totalMinutes / 60) % 24;
             const endMinutes = totalMinutes % 60;
 
-            // Format end time
             const ampm = endHours >= 12 ? 'PM' : 'AM';
             const displayHour = endHours > 12 ? endHours - 12 : endHours === 0 ? 12 : endHours;
 
             return `${displayHour}:${String(endMinutes).padStart(2, '0')} ${ampm}`;
         } catch (error) {
-            console.error('❌ Error calculating end time:', error);
             return '';
         }
     };
 
     if (!selectedService) {
-        console.error('❌ No selected service found, redirecting...');
         return <Navigate to={`/${businessSlug}/services`} replace />;
     }
 
@@ -258,7 +245,6 @@ export default function Confirmation() {
         );
     }
 
-    // Prepare active social media links (same logic as ClientSidebar)
     const activeSocialMedia = businessData ? [
         { name: 'facebook', url: businessData.facebook, Icon: FaFacebook },
         { name: 'twitter', url: businessData.twitter, Icon: FaXTwitter },
@@ -270,31 +256,6 @@ export default function Confirmation() {
         window.location.href = `/${businessSlug}/services`;
     };
 
-    const handleCancelBooking = async () => {
-        if (!bookingData?.id || !bookingData?.clientEmail) {
-            alert('Unable to cancel booking. Missing booking information.');
-            return;
-        }
-
-        try {
-            setLoading(true);
-
-            // Call cancel API
-            await bookingsAPI.cancelBooking(bookingData.id, bookingData.clientEmail);
-
-            alert('Booking cancelled successfully. You will receive a confirmation email.');
-            
-            // Redirect to services page
-            window.location.href = `/${businessSlug}/services`;
-
-        } catch (error: any) {
-            console.error('Error cancelling booking:', error);
-            alert(error.response?.data?.message || 'Failed to cancel booking. Please try again or contact the business.');
-            setLoading(false);
-        }
-    };
-
-    // Try to get date/time from different possible sources
     const finalDate = bookingDate || bookingDetails?.date || bookingData?.bookingDate;
     const finalTime = bookingTime || bookingDetails?.time || bookingData?.bookingTime;
     
@@ -346,7 +307,6 @@ export default function Confirmation() {
                         <h2 className="text-hoverGreen text-center font-semibold text-xl">Booking Confirmed</h2>
                         <h3 className="text-textPrimary text-center text-base break-words">with <span className="font-semibold">{businessData?.businessName || 'Business Name'}</span></h3>
 
-                        {/* Social Media Icons */}
                         {activeSocialMedia.length > 0 && (
                             <div className='flex gap-4 mt-2 mb-2'>
                                 {activeSocialMedia.map(({ name, url, Icon }) => (
@@ -363,7 +323,6 @@ export default function Confirmation() {
                             </div>
                         )}
 
-                        {/* Contact Info */}
                         <div className='mt-2 flex flex-col items-center justify-center text-textSecondary'>
                             {businessData?.phone && (
                                 <a 
@@ -386,7 +345,6 @@ export default function Confirmation() {
                         </div>
                     </div>
 
-                    {/* ✅ NEW: Calendar Sync Status */}
                     {(calendarSync || calendarConnected) && (
                         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <div className="flex items-start gap-3">
@@ -396,7 +354,6 @@ export default function Confirmation() {
                                         Google Calendar Status
                                     </h3>
                                     
-                                    {/* Business calendar synced */}
                                     {calendarSync?.businessCalendarSynced && (
                                         <div className="flex items-center gap-2 text-green-700 mb-2 text-sm">
                                             {FaCheck({ className: "w-4 h-4" })}
@@ -404,7 +361,6 @@ export default function Confirmation() {
                                         </div>
                                     )}
 
-                                    {/* Client calendar synced */}
                                     {(calendarConnected || calendarSync?.clientCalendarSynced) && (
                                         <div className="flex items-center gap-2 text-green-700 mb-2 text-sm">
                                             {FaCheck({ className: "w-4 h-4" })}
@@ -412,7 +368,6 @@ export default function Confirmation() {
                                         </div>
                                     )}
 
-                                    {/* Show "Add to Calendar" button if needed */}
                                     {showCalendarOption && !calendarConnected && (
                                         <div className="mt-3">
                                             <p className="text-sm text-blue-800 mb-3">
@@ -441,7 +396,6 @@ export default function Confirmation() {
                                         </div>
                                     )}
 
-                                    {/* Default message if no sync option */}
                                     {!showCalendarOption && !calendarConnected && !calendarSync?.clientCalendarSynced && (
                                         <p className="text-sm text-blue-800">
                                             📧 Check your email for calendar invitation
@@ -452,7 +406,6 @@ export default function Confirmation() {
                         </div>
                     )}
 
-                    {/* ✅ NEW: Chat History Notice */}
                     {hasChatHistory && chatMessageCount > 0 && (
                         <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-3">
                             <p className="text-sm text-purple-800">
@@ -508,7 +461,6 @@ export default function Confirmation() {
                         </div>
                     )}
 
-                    {/* ✅ UPDATED: Enhanced confirmation message */}
                     <div className="mt-6 bg-white border border-gray-200 rounded-lg p-4">
                         <h3 className="font-semibold text-sm mb-3">What happens next?</h3>
                         <ul className="space-y-2 text-xs text-gray-700">
@@ -524,7 +476,7 @@ export default function Confirmation() {
                             )}
                             <li className="flex items-start gap-2">
                                 <span className="text-green-500 mt-0.5">✓</span>
-                                <span>You can reschedule or cancel anytime using the link in your email</span>
+                                <span>You can cancel anytime by clicking the button below</span>
                             </li>
                             {hasChatHistory && (
                                 <li className="flex items-start gap-2">
@@ -544,15 +496,11 @@ export default function Confirmation() {
                         </button>
                     </div>
 
-                    {/* Reschedule and Cancel Actions */}
+                    {/* Simple cancel button */}
                     {bookingData?.id && (
                         <div className="mt-4 flex flex-col sm:flex-row gap-3 justify-center">
                             <button
-                                onClick={() => {
-                                    if (window.confirm('Are you sure you want to cancel this booking?')) {
-                                        handleCancelBooking();
-                                    }
-                                }}
+                                onClick={() => setShowCancelModal(true)}
                                 className="btn-secondary text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700 w-full md:w-auto px-8"
                             >
                                 ❌ Cancel Appointment
@@ -560,7 +508,6 @@ export default function Confirmation() {
                         </div>
                     )}
 
-                    {/* Manage Booking Link */}
                     <div className="mt-4 text-center">
                         <p className="text-xs text-gray-600">
                             Need to make changes?{' '}
@@ -574,6 +521,66 @@ export default function Confirmation() {
                     </div>
                 </div>
             </main>
+
+            {/* Cancel Modal */}
+            {showCancelModal && (
+                <>
+                    <div 
+                        className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+                        onClick={() => !cancelling && setShowCancelModal(false)}
+                    />
+                    <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-11/12 max-w-md bg-white rounded-2xl shadow-2xl z-50 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900">Cancel Appointment</h3>
+                            {!cancelling && (
+                                <button 
+                                    onClick={() => setShowCancelModal(false)}
+                                    className="text-gray-400 hover:text-gray-600"
+                                >
+                                    {IoClose({ size: 24 })}
+                                </button>
+                            )}
+                        </div>
+
+                        <p className="text-sm text-gray-600 mb-4">
+                            Please let us know why you're cancelling this appointment. Both you and {businessData?.businessName} will be notified.
+                        </p>
+
+                        <textarea
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            placeholder="e.g., Schedule conflict, emergency, need to reschedule..."
+                            rows={4}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm mb-4"
+                            disabled={cancelling}
+                        />
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowCancelModal(false)}
+                                disabled={cancelling}
+                                className="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition disabled:opacity-50"
+                            >
+                                Keep Appointment
+                            </button>
+                            <button
+                                onClick={handleCancelBooking}
+                                disabled={cancelling || !cancelReason.trim()}
+                                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {cancelling ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Cancelling...
+                                    </>
+                                ) : (
+                                    'Cancel Appointment'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
             
         </div>
     );
