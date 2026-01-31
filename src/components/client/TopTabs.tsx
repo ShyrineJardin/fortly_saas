@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import { FaImage, FaStar } from 'react-icons/fa6'
-import { FiCalendar } from "react-icons/fi"
+import { FaStoreAlt } from "react-icons/fa";
 
 export default function TopTabs() {
   const navigate = useNavigate()
@@ -10,7 +10,7 @@ export default function TopTabs() {
 
   const tabs = [
     { name: "Gallery", icon: FaImage, path: `/${businessSlug}/gallery` },
-    { name: "Services", icon: FiCalendar, path: `/${businessSlug}/services` },
+    { name: "Services", icon: FaStoreAlt, path: `/${businessSlug}/services` },
     { name: "Reviews", icon: FaStar, path: `/${businessSlug}/reviews` }
   ]
 
