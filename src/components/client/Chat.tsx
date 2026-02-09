@@ -492,7 +492,8 @@ export default function ChatWidget({
 
         await loadMessages(userEmail, true);
       } catch (error) {
-        console.error('Error sending message:', error);        setMessages(prev => prev.filter(msg => msg.id !== tempId));
+        console.error('Error sending message:', error);        
+        setMessages(prev => prev.filter(msg => msg.id !== tempId));
         setMessage(messageText);
       }
     }
@@ -623,7 +624,7 @@ export default function ChatWidget({
                 onClick={() => setIsOpen(false)}
                 className="p-1 hover:bg-gray-100 rounded-full transition-colors"
               >
-                {FaAngleDown ({size:20, className:"text-gray-600"})} 
+                {FaAngleDown({size:20, className:"text-gray-600"})}
               </button>
             </div>
 
@@ -695,7 +696,7 @@ export default function ChatWidget({
                       onClick={() => fileInputRef.current?.click()}
                       className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
                     >
-                      {IoImageOutline ({size:20})} 
+                      {IoImageOutline({size:20})}
                     </button>
                     <input
                       type="text"
@@ -709,7 +710,7 @@ export default function ChatWidget({
                       onClick={handleSendMessage}
                       className="p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors"
                     >
-                      {IoSend ({size:20})} 
+                      {IoSend({size:20})}
                     </button>
                   </div>
                 </div>
@@ -722,19 +723,20 @@ export default function ChatWidget({
           <button
             onClick={() => setIsOpen(true)}
             className="bg-primaryGreen text-white p-4 rounded-full shadow-lg hover:bg-hoverGreen transition-colors"
+            title="Open Chat"
           >
-            {IoChatbubbleEllipsesOutline ({size:25})} 
+            {IoChatbubbleEllipsesOutline({size:25})}
           </button>
         )}
       </div>
 
-      {/* MOBILE FULL-SCREEN CHAT */}
+      {/* MOBILE FULL-SCREEN CHAT - Opens from top bar, no floating button */}
       {isOpen && (
         <div className="lg:hidden fixed inset-0 bg-white z-50 flex flex-col">
           <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0">
             <div className="flex items-center gap-3">
               <button onClick={() => setIsOpen(false)} className="p-2 -ml-2">
-                {FaChevronLeft ({size:20})} 
+                {FaChevronLeft({size:20})}
               </button>
               {businessLogo ? (
                 <img 
@@ -817,7 +819,7 @@ export default function ChatWidget({
                     onClick={() => fileInputRef.current?.click()}
                     className="p-2 text-gray-500"
                   >
-                      {IoImageOutline ({size:24})} 
+                    {IoImageOutline({size:24})}
                   </button>
                   <input
                     type="text"
@@ -831,7 +833,7 @@ export default function ChatWidget({
                     onClick={handleSendMessage}
                     className="p-2 text-primaryGreen"
                   >
-                      {IoSend ({size:24})} 
+                    {IoSend({size:24})}
                   </button>
                 </div>
               </div>

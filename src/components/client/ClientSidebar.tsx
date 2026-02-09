@@ -3,6 +3,7 @@ import { FaFacebook, FaXTwitter, FaInstagram, FaLinkedin, FaLocationDot, FaAngle
 import { BsFillTelephoneFill } from "react-icons/bs";
 import { MdQuestionMark, MdEmail } from "react-icons/md";
 import { HiOutlineChat } from "react-icons/hi";
+import { HiCalendar } from "react-icons/hi2";
 import { businessAPI } from '../../utils/api';
 import { useParams,  useNavigate } from 'react-router-dom';
 
@@ -98,12 +99,25 @@ export default function ClientSidebar() {
             <h3 className="font-semibold md:text-base text-sm">{businessData.businessName}</h3>
             {FaChevronRight({size: 16, className: "text-gray-600"})}
           </button>
-          <button 
+
+          <div className="">
+            <button 
+            onClick={() => window.dispatchEvent(new CustomEvent('openAppointment'))} 
+            className='p-2'
+            >
+            {HiCalendar({size: 28})}
+            </button>
+
+            <button 
             onClick={() => window.dispatchEvent(new CustomEvent('openChat'))} 
             className='p-2'
-          >
+            >
             {HiOutlineChat({size: 28})}
-          </button>
+            </button>
+
+          </div>
+          
+          
         </div>
       </div>
 

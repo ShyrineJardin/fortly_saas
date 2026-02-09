@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom"
+import { useState } from "react"
 import GalleryGrid from "./components/client/GalleryGrid"
 import ServicesPage from "./pages/client/ServicesPage"
 import ReviewsPage from "./pages/client/ReviewsPage"
@@ -17,6 +18,7 @@ import ClientSidebar from "./components/client/ClientSidebar"
 import Footer from "./components/client/Footer"
 import TopTabs from "./components/client/TopTabs"
 import ChatWidget from "./components/client/Chat"
+import AppointmentWidget from "./components/client/Appointment"
 import BusinessLayout from "./components/layout/BusinessLayout"
 import BusinessSidebar from "./components/business/BusinessSidebar"
 import BusinessTopTabs from "./components/business/BusinessTopTabs"
@@ -26,8 +28,18 @@ function UnifiedClientLayout() {
   const location = useLocation()
   const { pathname } = location
   
-  // Check if current route is booking
+  // Check if current route is booking or confirmation
   const isBookingFlow = pathname.includes('/booking')
+  const isConfirmationFlow = pathname.includes('/confirmation')
+  
+  // Extract businessSlug from pathname
+  const businessSlug = pathname.split('/')[1] || ""
+  
+  // Get client email from localStorage (same as chat)
+  const clientEmail = localStorage.getItem(`chat_${businessSlug}_email`) || ""
+  
+  // State for mobile actions
+  const [mobileAction, setMobileAction] = useState<'chat' | 'appointment' | null>(null)
   
   return (
     <div className='flex flex-col min-h-screen'>
@@ -35,6 +47,7 @@ function UnifiedClientLayout() {
       <div className='lg:hidden'>
         <ClientSidebar />
       </div>
+      
       
       <div className='flex flex-1'>
         {/* Desktop Sidebar - STAYS MOUNTED */}
@@ -44,7 +57,7 @@ function UnifiedClientLayout() {
         
         <main className='flex-1 p-4 lg:p-6 overflow-y-auto'>
           {/* Conditionally render TopTabs with smooth transition */}
-          {!isBookingFlow && (
+          {!isBookingFlow && !isConfirmationFlow && (
             <div className="transition-all duration-300 ease-in-out">
               <TopTabs />
             </div>
@@ -62,9 +75,17 @@ function UnifiedClientLayout() {
         <Footer />
       </footer>
 
+      {/* Appointment Widget - Only show when not on confirmation page */}
+      {!isConfirmationFlow && (
+        <AppointmentWidget 
+          businessSlug={businessSlug}
+          clientEmail={clientEmail}
+        />
+      )}
+
       {/* Chat Widget - STAYS MOUNTED */}
       <ChatWidget 
-        businessSlug={pathname.split('/')[1] || ""} 
+        businessSlug={businessSlug} 
         apiBaseUrl={process.env.REACT_APP_API_URL || "http://localhost:5000/api"}
       />
     </div>
