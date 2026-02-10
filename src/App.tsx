@@ -12,6 +12,7 @@ import OnboardingPage from './pages/business/OnboardingPage'
 import BusinessGallery from './components/business/BusinessGallery'
 import BusinessReviewsPage from "./pages/business/BusinessReviewsPage"
 import BusinessServicePage from "./pages/business/BusinessServicePage"
+import BusinessCalendar from "./components/business/BusinessCalendar"
 
 // Shared layout components
 import ClientSidebar from "./components/client/ClientSidebar"
@@ -94,13 +95,20 @@ function UnifiedClientLayout() {
 
 // Business pages wrapper
 function BusinessPageLayout() {
+
+  const location = useLocation()
+  const { pathname } = location
+  
+  // Check if current route is calendar
+  const isCalendarPage = pathname.includes('/calendar')
+
   return (
     <BusinessLayout 
       showBusinessHeader={true}
       sidebar={<BusinessSidebar />}
       footer={<Footer />}
     >
-      <BusinessTopTabs />
+      {!isCalendarPage && <BusinessTopTabs />}
       <Outlet />
     </BusinessLayout>
   )
@@ -121,6 +129,7 @@ export default function App() {
           <Route path="gallery" element={<BusinessGallery />} />
           <Route path="reviews" element={<BusinessReviewsPage />} />
           <Route path="services" element={<BusinessServicePage />} />
+          <Route path="calendar" element={<BusinessCalendar />} />
         </Route>
 
         {/* Client Routes - UNIFIED LAYOUT (for main pages) */}

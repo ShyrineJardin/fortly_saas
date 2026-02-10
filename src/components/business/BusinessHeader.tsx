@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { IoCopyOutline, IoMenuOutline} from "react-icons/io5";
 import { HiOutlineChat } from "react-icons/hi";
 import { authAPI } from '../../utils/api';
+import BusinessCalendar from './BusinessCalendar';
 
 export default function BusinessHeader() {
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isComingSoonOpen, setIsComingSoonOpen] = useState(false);
@@ -38,17 +41,8 @@ export default function BusinessHeader() {
     }
   };
 
-  const handleOpenBookings = () => {
-    // Open Google Calendar for the business email address
-    const businessEmail = businessData?.email;
-    if (businessEmail) {
-      // Format: https://calendar.google.com/calendar/u/0/r?cid=email@domain.com
-      const calendarUrl = `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(businessEmail)}`;
-      window.open(calendarUrl, '_blank', 'noopener,noreferrer');
-    } else {
-      // Fallback to general Google Calendar if email is not available
-      window.open('https://calendar.google.com/calendar/u/0/r', '_blank', 'noopener,noreferrer');
-    }
+  const handleOpenCalendar = () => {
+    navigate('/business/calendar');
   };
 
   const handleUnlockPro = () => {
@@ -184,10 +178,10 @@ export default function BusinessHeader() {
 
                 <div className="flex items-center gap-6">
                     <button 
-                      onClick={handleOpenBookings}
+                      onClick={handleOpenCalendar}
                       className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium"
                     >
-                      Open Bookings
+                      Calendar
                     </button>
                     <button 
                       onClick={handleUnlockPro}
@@ -242,7 +236,12 @@ export default function BusinessHeader() {
                 <a href={`/${businessData.slug}`} target="_blank" rel="noopener noreferrer">Preview Website</a>
               </li>
               <li className="px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">
-                <button onClick={handleOpenBookings} className="w-full text-center">Open Bookings</button>
+                  <button 
+                    onClick={handleOpenCalendar}
+                    className="w-full text-center"
+                  >
+                    Calendar
+                  </button>
               </li>
               <li className="px-4 py-2">
                 <button 

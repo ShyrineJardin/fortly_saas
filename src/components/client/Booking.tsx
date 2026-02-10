@@ -17,9 +17,7 @@ export default function BookingPage() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState("");
   const [takenTimeSlots, setTakenTimeSlots] = useState<any[]>([]);
-  const [syncToCalendar, setSyncToCalendar] = useState(false);
 
-  // ✅ NEW: Submitting state for clean loading screen
   const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -164,7 +162,6 @@ export default function BookingPage() {
         bookingDate: formattedBookingDate,
         bookingTime: selectedSlot?.time || selectedTime,
         notes: formData.message,
-        syncToClientCalendar: syncToCalendar
       };
 
       console.log('📤 Submitting booking:', bookingData);
@@ -528,19 +525,6 @@ export default function BookingPage() {
             </label>
           </div>
 
-          <div className="flex items-center gap-3 w-full max-w-md">
-            <input
-              type="checkbox"
-              id="syncCalendar"
-              checked={syncToCalendar}
-              onChange={(e) => setSyncToCalendar(e.target.checked)}
-              className="w-5 h-5 mt-0.5 text-primaryGreen focus:ring-primaryGreen border-gray-300 rounded"
-            />
-            <label htmlFor="syncCalendar" className="text-sm text-gray-600 flex-1 flex items-center gap-2">
-              {FaCalendar({ className: "w-4 h-4 text-primaryGreen" })}
-              Add to my Google Calendar automatically
-            </label>
-          </div>
 
           <button
             onClick={handleSubmit}

@@ -345,72 +345,10 @@ export default function Confirmation() {
                         </div>
                     </div>
 
-                    {(calendarSync || calendarConnected) && (
-                        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                                {FaCalendar({ className: "w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" })}
-                                <div className="flex-1">
-                                    <h3 className="font-semibold text-blue-900 text-sm mb-2">
-                                        Google Calendar Status
-                                    </h3>
-                                    
-                                    {calendarSync?.businessCalendarSynced && (
-                                        <div className="flex items-center gap-2 text-green-700 mb-2 text-sm">
-                                            {FaCheck({ className: "w-4 h-4" })}
-                                            <span>Added to business calendar</span>
-                                        </div>
-                                    )}
-
-                                    {(calendarConnected || calendarSync?.clientCalendarSynced) && (
-                                        <div className="flex items-center gap-2 text-green-700 mb-2 text-sm">
-                                            {FaCheck({ className: "w-4 h-4" })}
-                                            <span>Added to your Google Calendar</span>
-                                        </div>
-                                    )}
-
-                                    {showCalendarOption && !calendarConnected && (
-                                        <div className="mt-3">
-                                            <p className="text-sm text-blue-800 mb-3">
-                                                📅 Want this appointment in your Google Calendar?
-                                            </p>
-                                            <button
-                                                onClick={handleConnectCalendar}
-                                                disabled={connectingCalendar}
-                                                className="px-4 py-2 bg-primaryGreen text-white rounded-lg hover:bg-hoverGreen transition text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                {connectingCalendar ? (
-                                                    <>
-                                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                        Connecting...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        {FaCalendar({ className: "w-4 h-4" })}
-                                                        Add to My Calendar
-                                                    </>
-                                                )}
-                                            </button>
-                                            <p className="text-xs text-gray-600 mt-2">
-                                                This will automatically add the appointment to your Google Calendar with all details and reminders
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {!showCalendarOption && !calendarConnected && !calendarSync?.clientCalendarSynced && (
-                                        <p className="text-sm text-blue-800">
-                                            📧 Check your email for calendar invitation
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     {hasChatHistory && chatMessageCount > 0 && (
                         <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-3">
                             <p className="text-sm text-purple-800">
                                 💬 <strong>{chatMessageCount} message{chatMessageCount !== 1 ? 's' : ''}</strong> from your conversation 
-                                {calendarSync?.businessCalendarSynced && ' are included in the calendar event for reference'}
                             </p>
                         </div>
                     )}
@@ -461,22 +399,16 @@ export default function Confirmation() {
                         </div>
                     )}
 
-                    <div className="mt-6 bg-white border border-gray-200 rounded-lg p-4">
+                    <div className="mt-3 mb-3 bg-softGreen border border-gray-200 rounded-lg p-4">
                         <h3 className="font-semibold text-sm mb-3">What happens next?</h3>
                         <ul className="space-y-2 text-xs text-gray-700">
                             <li className="flex items-start gap-2">
                                 <span className="text-green-500 mt-0.5">✓</span>
                                 <span>You'll receive a confirmation email with all booking details</span>
                             </li>
-                            {(calendarSync?.businessCalendarSynced || calendarConnected) && (
-                                <li className="flex items-start gap-2">
-                                    <span className="text-green-500 mt-0.5">✓</span>
-                                    <span>Calendar event created with reminders 24 hours and 1 hour before</span>
-                                </li>
-                            )}
                             <li className="flex items-start gap-2">
                                 <span className="text-green-500 mt-0.5">✓</span>
-                                <span>You can cancel anytime by clicking the button below</span>
+                                <span>You can cancel anytime by clicking the button below or by visiting the site</span>
                             </li>
                             {hasChatHistory && (
                                 <li className="flex items-start gap-2">
@@ -513,7 +445,7 @@ export default function Confirmation() {
                             Need to make changes?{' '}
                             <a 
                                 href={`mailto:${businessData?.email || ''}`}
-                                className="text-primaryGreen hover:underline font-medium"
+                                className="text-hoverGreen hover:underline font-medium"
                             >
                                 Contact us
                             </a>
