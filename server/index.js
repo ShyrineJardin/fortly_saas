@@ -20,6 +20,7 @@ const bookingRoutes = require('./routes/bookings');
 const chatRoutes = require('./routes/chat');
 const reviewRoutes = require('./routes/reviews');
 const googleCalendarRoutes = require('./routes/googleCalendar'); 
+const googleAuthRoutes = require('./routes/google-auth');
 
 // Now we can use sequelize and DataTypes
 const ClientCalendarToken = require('./models/ClientCalendarToken')(sequelize, DataTypes);
@@ -146,6 +147,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/googleCalendar', googleCalendarRoutes); 
+app.use('/api/auth', googleAuthRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

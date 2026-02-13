@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { authAPI, setAuthToken } from '../../utils/api'
 
 export default function Signup() {
@@ -15,6 +15,15 @@ export default function Signup() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    // Check if there's an error from OAuth redirect
+    const oauthError = searchParams.get('error');
+    if (oauthError) {
+      setError(oauthError);
+    }
+  }, [searchParams]);
 
   // Generate slug preview
   const generateSlugPreview = (name) => {
@@ -69,6 +78,11 @@ export default function Signup() {
       setLoading(false)
     }
   }
+
+  const handleGoogleSignIn = () => {
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+    window.location.href = `${apiUrl}/auth/google`;
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -259,9 +273,10 @@ export default function Signup() {
             <div className="flex-1 border-t border-gray-300"></div>
           </div>
 
-          {/* Google Sign Up - DISABLED for now */}
+          {/* Google Sign Up */}
           <button
             type="button"
+            onClick={handleGoogleSignIn}
             className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-3xl transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={loading}
           >
@@ -271,7 +286,7 @@ export default function Signup() {
               <path d="M4.56364 11.9C4.35455 11.3 4.23636 10.6591 4.23636 10C4.23636 9.34091 4.35455 8.7 4.56364 8.1V5.50909H1.18182C0.509091 6.85909 0.136364 8.38636 0.136364 10C0.136364 11.6136 0.509091 13.1409 1.18182 14.4909L4.56364 11.9Z" fill="#FBBC04"/>
               <path d="M10.2 3.97727C11.6 3.97727 12.8455 4.48182 13.8182 5.40909L16.7364 2.49091C15.1682 1.02273 12.8955 0.136364 10.2 0.136364C6.26364 0.136364 2.81818 2.37727 1.18182 5.50909L4.56364 8.1C5.37273 5.73636 7.59545 3.97727 10.2 3.97727Z" fill="#EA4335"/>
             </svg>
-            Sign in with Google
+            Sign up with Google
           </button>
 
           {/* Sign In Link */}

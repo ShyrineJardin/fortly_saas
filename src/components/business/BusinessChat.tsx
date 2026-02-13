@@ -3,6 +3,7 @@ import { IoChatbubbleEllipsesOutline, IoClose, IoSend, IoImageOutline, IoSearch 
 import { FaAngleDown, FaChevronLeft } from 'react-icons/fa6';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
+import { useLocation } from "react-router-dom";
 
 interface Client {
   id: number;
@@ -34,6 +35,8 @@ export default function BusinessChat({
   businessSlug,
   apiBaseUrl = 'http://localhost:5000/api' 
 }: BusinessChatProps) {
+  const location = useLocation();
+  const { pathname } = location;
   const [isOpen, setIsOpen] = useState(false);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -125,6 +128,25 @@ export default function BusinessChat({
       }
     };
   }, [businessSlug, activeChat, apiBaseUrl]);
+
+  
+  // 🚫 Hide chat on auth & onboarding screens
+  const hiddenRoutes = [
+    '/business/login',
+    '/business/signup',
+    '/business/onboarding',
+    '/business/forgot-password',
+    '/business/reset-password'
+  ];
+  
+  const shouldHideChat = hiddenRoutes.some(route =>
+    pathname.startsWith(route)
+  );
+  
+  // ⛔ Completely do not render chat
+  if (shouldHideChat) {
+    return null;
+  }
 
   const loadClients = async () => {
     setIsLoadingClients(true);
