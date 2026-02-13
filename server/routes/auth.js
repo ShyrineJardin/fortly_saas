@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 
@@ -119,6 +120,95 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Forgot Password - Send reset email
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Find business by email
+    const business = await db.Business.findOne({ where: { email } });
+
+    if (!business) {
+      // Don't reveal if email exists or not for security
+      return res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
+    }
+
+    // Generate reset token (valid for 1 hour)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Save token to database
+    business.resetPasswordToken = resetToken;
+    business.resetPasswordExpires = resetTokenExpiry;
+    await business.save();
+
+    // Create reset URL
+    const resetUrl = `${process.env.FRONTEND_URL}/business/reset-password?token=${resetToken}`;
+
+    // Get emailService from services folder
+    const emailService = require('../services/emailService');
+
+    // Send password reset email
+    await emailService.sendPasswordResetEmail(business, resetUrl, resetToken);
+
+    res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
+  }
+});
+
+// Reset Password - Update password with token
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ message: 'Token and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    // Find business with valid reset token
+    const business = await db.Business.findOne({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: {
+          [db.Sequelize.Op.gt]: new Date() // Token not expired
+        }
+      }
+    });
+
+    if (!business) {
+      return res.status(400).json({ message: 'Invalid or expired reset token. Please request a new password reset.' });
+    }
+
+    // Update password (will be hashed by the beforeCreate hook)
+    const bcrypt = require('bcryptjs');
+    const salt = await bcrypt.genSalt(10);
+    business.password = await bcrypt.hash(password, salt);
+    
+    // Clear reset token fields
+    business.resetPasswordToken = null;
+    business.resetPasswordExpires = null;
+    
+    await business.save();
+
+    // Get emailService from services folder
+    const emailService = require('../services/emailService');
+
+    // Send confirmation email
+    await emailService.sendPasswordResetConfirmation(business);
+
+    res.json({ message: 'Password reset successful. You can now login with your new password.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Failed to reset password. Please try again.' });
   }
 });
 

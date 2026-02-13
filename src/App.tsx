@@ -13,6 +13,9 @@ import BusinessGallery from './components/business/BusinessGallery'
 import BusinessReviewsPage from "./pages/business/BusinessReviewsPage"
 import BusinessServicePage from "./pages/business/BusinessServicePage"
 import BusinessCalendar from "./components/business/BusinessCalendar"
+import AuthCallback from './components/shared/AuthCallback';
+import ResetPasswordPage from "./pages/business/ResetPasswordPage"
+import ForgotPasswordPage from './pages/business/ForgotPasswordPage';
 
 // Shared layout components
 import ClientSidebar from "./components/client/ClientSidebar"
@@ -122,6 +125,9 @@ export default function App() {
         <Route path="/business/login" element={<LoginPage />} />
         <Route path="/business/signup" element={<SignupPage />} />
         <Route path="/business/onboarding" element={<OnboardingPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/business/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/business/reset-password" element={<ResetPasswordPage />} />
         
         {/* Business Dashboard Routes */}
         <Route path="/business" element={<BusinessPageLayout />}>
