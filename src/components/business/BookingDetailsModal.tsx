@@ -1,8 +1,13 @@
-import React from 'react';
-import { IoClose, IoChatbubbleEllipsesOutline, IoCalendarOutline, IoTimeOutline, IoPersonOutline, IoMailOutline, IoCallOutline, IoLocationOutline } from 'react-icons/io5';
+import React, { useState } from 'react';
+import { IoClose, IoChatbubbleEllipsesOutline, IoCalendarOutline, IoTimeOutline, IoPersonOutline, IoMailOutline, IoCallOutline, IoLocationOutline, IoWarning, IoCheckmarkCircle } from 'react-icons/io5';
 import { formatDate, formatTime, formatDateTime } from '../../utils/dateHelpers';
 
 export default function BookingDetailsModal({ booking, onClose, onChat, onUpdateStatus }) {
+  const [updating, setUpdating] = useState(false);
+  const [actionType, setActionType] = useState(null); // 'confirm', 'complete', 'cancel'
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{status: string, action: string} | null>(null);
+
   if (!booking) return null;
 
   const getStatusColor = (status) => {
@@ -20,11 +25,86 @@ export default function BookingDetailsModal({ booking, onClose, onChat, onUpdate
     }
   };
 
-  const handleStatusChange = (newStatus) => {
-    if (window.confirm(`Are you sure you want to mark this booking as ${newStatus}?`)) {
-      onUpdateStatus(booking.id, newStatus);
+   const handleStatusChange = (newStatus, action) => {
+    setPendingAction({ status: newStatus, action });
+    setShowConfirmModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!pendingAction) return;
+
+    setUpdating(true);
+    setActionType(pendingAction.action);
+    try {
+      await onUpdateStatus(booking.id, pendingAction.status);
+      setShowConfirmModal(false);
+      setPendingAction(null);
+    } catch (error) {
+      console.error('Error updating status:', error);
+    } finally {
+      setUpdating(false);
+      setActionType(null);
     }
   };
+
+  const cancelStatusChange = () => {
+    setShowConfirmModal(false);
+    setPendingAction(null);
+  };
+
+  const getConfirmModalConfig = () => {
+    if (!pendingAction) return null;
+
+    switch (pendingAction.action) {
+      case 'confirm':
+        return {
+          icon: IoCheckmarkCircle,
+          iconColor: 'text-green-600',
+          iconBg: 'bg-green-100',
+          headerBg: 'bg-green-50',
+          borderColor: 'border-green-100',
+          title: 'Confirm Booking',
+          message: 'Are you sure you want to confirm this booking?',
+          buttonColor: 'bg-green-600 hover:bg-green-700 shadow-green-600/30',
+          buttonText: 'Yes, Confirm',
+        };
+      case 'complete':
+        return {
+          icon: IoCheckmarkCircle,
+          iconColor: 'text-blue-600',
+          iconBg: 'bg-blue-100',
+          headerBg: 'bg-blue-50',
+          borderColor: 'border-blue-100',
+          title: 'Mark as Completed',
+          message: 'Are you sure this booking has been completed?',
+          buttonColor: 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30',
+          buttonText: 'Yes, Complete',
+        };
+      case 'cancel':
+        return {
+          icon: IoWarning,
+          iconColor: 'text-red-600',
+          iconBg: 'bg-red-100',
+          headerBg: 'bg-red-50',
+          borderColor: 'border-red-100',
+          title: 'Cancel Booking',
+          message: 'Are you sure you want to cancel this booking? This action cannot be undone.',
+          buttonColor: 'bg-red-600 hover:bg-red-700 shadow-red-600/30',
+          buttonText: 'Yes, Cancel',
+        };
+      default:
+        return null;
+    }
+  };
+
+  const LoadingSpinner = () => (
+    <svg className="animate-spin h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  );
+
+  const modalConfig = getConfirmModalConfig();
 
   return (
     <>
@@ -41,7 +121,8 @@ export default function BookingDetailsModal({ booking, onClose, onChat, onUpdate
             <h2 className="text-2xl font-bold text-gray-900">Booking Details</h2>
             <button 
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              disabled={updating}
+              className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {IoClose({size: 28})}
             </button>
@@ -57,7 +138,8 @@ export default function BookingDetailsModal({ booking, onClose, onChat, onUpdate
             {booking.hasChatHistory && (
               <button
                 onClick={() => onChat(booking.clientEmail)}
-                className="flex items-center gap-2 px-4 py-2 bg-softGreen text-hoverGreen rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+                disabled={updating}
+                className="flex items-center gap-2 px-4 py-2 bg-softGreen text-hoverGreen rounded-lg hover:bg-green-100 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {IoChatbubbleEllipsesOutline({size: 18})}
                 <span>Open Chat</span>
@@ -188,25 +270,31 @@ export default function BookingDetailsModal({ booking, onClose, onChat, onUpdate
             <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-100">
               {booking.status === 'pending' && (
                 <button
-                  onClick={() => handleStatusChange('confirmed')}
-                  className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                  onClick={() => handleStatusChange('confirmed', 'confirm')}
+                  disabled={updating}
+                  className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Confirm Booking
+                  {updating && actionType === 'confirm' && <LoadingSpinner />}
+                  {updating && actionType === 'confirm' ? 'Confirming...' : 'Confirm Booking'}
                 </button>
               )}
               {booking.status === 'confirmed' && (
                 <button
-                  onClick={() => handleStatusChange('completed')}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  onClick={() => handleStatusChange('completed', 'complete')}
+                  disabled={updating}
+                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Mark as Completed
+                  {updating && actionType === 'complete' && <LoadingSpinner />}
+                  {updating && actionType === 'complete' ? 'Completing...' : 'Mark as Completed'}
                 </button>
               )}
               <button
-                onClick={() => handleStatusChange('cancelled')}
-                className="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                onClick={() => handleStatusChange('cancelled', 'cancel')}
+                disabled={updating}
+                className="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Cancel Booking
+                {updating && actionType === 'cancel' && <LoadingSpinner />}
+                {updating && actionType === 'cancel' ? 'Cancelling...' : 'Cancel Booking'}
               </button>
             </div>
           )}
@@ -221,6 +309,78 @@ export default function BookingDetailsModal({ booking, onClose, onChat, onUpdate
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && modalConfig && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl animate-slideUp">
+            {/* Modal Header */}
+            <div className={`${modalConfig.headerBg} border-b ${modalConfig.borderColor} p-6 rounded-t-2xl`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`${modalConfig.iconBg} p-3 rounded-full`}>
+                    {modalConfig.icon({className: modalConfig.iconColor, size: 24})}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{modalConfig.title}</h3>
+                    <p className="text-sm text-gray-600 mt-1">Please confirm your action</p>
+                  </div>
+                </div>
+                <button
+                  onClick={cancelStatusChange}
+                  disabled={updating}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {IoClose({className: "text-gray-500", size: 20})}
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <p className="text-sm text-gray-700 mb-4">
+                {modalConfig.message}
+              </p>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <p className="font-semibold text-gray-900 mb-2">{booking.Service?.name}</p>
+                <div className="flex items-center gap-4 text-xs text-gray-600">
+                  <span className="flex items-center gap-1">
+                    {IoCalendarOutline({size: 14})}
+                    {formatDate(booking.bookingDate)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {IoTimeOutline({size: 14})}
+                    {formatTime(booking.bookingTime)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  Client: {booking.clientName}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelStatusChange}
+                  disabled={updating}
+                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  No, Go Back
+                </button>
+                <button
+                  onClick={confirmStatusChange}
+                  disabled={updating}
+                  className={`flex-1 py-3 text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${modalConfig.buttonColor} shadow-lg`}
+                >
+                  {updating && <LoadingSpinner />}
+                  {updating ? 'Processing...' : modalConfig.buttonText}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

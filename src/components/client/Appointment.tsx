@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaCalendar, FaClock, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaStickyNote, FaTimes, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaChevronLeft } from 'react-icons/fa';
+import { FaCalendar, FaClock, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaStickyNote, FaTimes, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaChevronLeft, FaExclamationTriangle } from 'react-icons/fa';
 import { HiCalendar } from "react-icons/hi2";
 import { bookingsAPI } from '../../utils/api';
 
@@ -33,6 +33,14 @@ interface AppointmentWidgetProps {
   businessSlug: string;
   clientEmail: string;
 }
+
+// Loading Spinner Component
+const LoadingSpinner = () => (
+  <svg className="animate-spin h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
 
 // ==================== BOOKING CARD COMPONENT ====================
 const BookingCard = ({ 
@@ -238,65 +246,91 @@ const BookingCard = ({
         </div>
       </div>
 
-      {/* Cancel Modal */}
+      {/* Cancel Confirmation Modal */}
       {showCancelModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Cancel Booking</h3>
-              <button
-                onClick={() => setShowCancelModal(false)}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                {FaTimes({className: "text-gray-500", size:18})}
-              </button>
-            </div>
-
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">
-                Are you sure you want to cancel this appointment?
-              </p>
-              <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-700">
-                <p><strong>{booking.Service.title}</strong></p>
-                <p>{formatDate(booking.bookingDate)} at {formatTime(booking.bookingTime)}</p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl animate-slideUp">
+            {/* Modal Header */}
+            <div className="bg-red-50 border-b border-red-100 p-6 rounded-t-2xl">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="bg-red-100 p-3 rounded-full">
+                    {FaExclamationTriangle({className: "text-red-600", size:20})}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Cancel Booking</h3>
+                    <p className="text-sm text-gray-600 mt-1">This action cannot be undone</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  disabled={cancelling}
+                  className="p-1 hover:bg-red-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {FaTimes({className: "text-gray-500", size:18})}
+                </button>
               </div>
             </div>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-3">
+                  Are you sure you want to cancel this appointment?
+                </p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
+                  <p className="font-semibold text-gray-900 mb-1">{booking.Service.title}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    {FaCalendar({size:10})}
+                    <span>{formatDate(booking.bookingDate)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
+                    {FaClock({size:10})}
+                    <span>{formatTime(booking.bookingTime)}</span>
+                  </div>
+                </div>
               </div>
-            )}
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Reason for cancellation <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Please let us know why you're cancelling..."
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm resize-none"
-                required
-              />
-            </div>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+                  {FaExclamationTriangle({className: "text-red-600 flex-shrink-0 mt-0.5", size:14})}
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              )}
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowCancelModal(false)}
-                disabled={cancelling}
-                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Keep Booking
-              </button>
-              <button
-                onClick={handleCancelBooking}
-                disabled={cancelling || !cancelReason.trim()}
-                className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-medium text-sm hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
-              </button>
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Reason for cancellation <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Please let us know why you're cancelling..."
+                  rows={3}
+                  disabled={cancelling}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm resize-none disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50"
+                  required
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  disabled={cancelling}
+                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Keep Booking
+                </button>
+                <button
+                  onClick={handleCancelBooking}
+                  disabled={cancelling || !cancelReason.trim()}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-red-600/30"
+                >
+                  {cancelling && <LoadingSpinner />}
+                  {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -360,7 +394,7 @@ export default function AppointmentWidget({
   ).sort((a, b) => {
     const dateA = new Date(`${a.bookingDate}T${a.bookingTime}`);
     const dateB = new Date(`${b.bookingDate}T${b.bookingTime}`);
-    return dateB.getTime() - dateA.getTime();
+    return dateB.getTime() - dateA.getTime(); // Newest to oldest
   });
 
   const displayedBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
