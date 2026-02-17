@@ -2,20 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
-const multer = require('multer');
-const path = require('path');
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/business/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-
-const upload = multer({ storage });
+const { uploadLogo } = require('../config/cloudinary');
 
 // Get business by slug (public route for clients)
 router.get('/:slug', async (req, res) => {
@@ -50,7 +37,7 @@ router.get('/:slug', async (req, res) => {
 });
 
 // Complete onboarding
-router.put('/onboarding', authMiddleware, upload.fields([
+router.put('/onboarding', authMiddleware, uploadLogo.fields([
   { name: 'logo', maxCount: 1 },
 ]), async (req, res) => {
   try {
@@ -84,7 +71,7 @@ router.put('/onboarding', authMiddleware, upload.fields([
     };
 
     if (req.files?.logo) {
-      updateData.logo = '/uploads/business/' + req.files.logo[0].filename;
+      updateData.logo = req.files.logo[0].path; // Cloudinary URL
     }
 
     await db.Business.update(updateData, {
@@ -106,7 +93,7 @@ router.put('/onboarding', authMiddleware, upload.fields([
 });
 
 // Update business profile
-router.put('/profile', authMiddleware, upload.fields([
+router.put('/profile', authMiddleware, uploadLogo.fields([
   { name: 'logo', maxCount: 1 },
 ]), async (req, res) => {
   try {
@@ -143,7 +130,7 @@ router.put('/profile', authMiddleware, upload.fields([
     };
 
     if (req.files?.logo) {
-      updateData.logo = '/uploads/business/' + req.files.logo[0].filename;
+      updateData.logo = req.files.logo[0].path; // Cloudinary URL
     }
 
     await db.Business.update(updateData, {
