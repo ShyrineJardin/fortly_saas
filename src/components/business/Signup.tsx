@@ -277,7 +277,7 @@ export default function Signup() {
           <button
             type="button"
             onClick={handleGoogleSignIn}
-            className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-3xl transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-white border text-sm border-gray-300 hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-3xl transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={loading}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
