@@ -72,7 +72,7 @@ export default function ResetPassword() {
             <div className="space-y-3">
               <Link 
                 to="/business/forgot-password" 
-                className="w-full bg-primaryGreen hover:bg-hoverGreen text-white font-medium py-3 px-4 rounded-lg transition duration-200 block text-center"
+                className="btn-primary w-full mt-2 mb-2 disabled:opacity-50 disabled:cursor-not-allowed block text-center"
               >
                 Request New Reset Link
               </Link>
@@ -90,7 +90,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex justify-center items-center p-4 bg-backgroundColor">
+    <div className="min-h-screen flex justify-center items-center">
       <div className="w-full max-w-md">
         <div className='flex flex-col text-center'>
           <h2 className="lg:text-3xl text-2xl font-semibold text-textPrimaryColor">Reset Your Password</h2>
@@ -186,7 +186,7 @@ export default function ResetPassword() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primaryGreen hover:bg-hoverGreen text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary w-full mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Resetting Password...' : 'Reset Password'}
             </button>

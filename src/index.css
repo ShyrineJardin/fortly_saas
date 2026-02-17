@@ -23,11 +23,11 @@ body {
 /* Reusable component styles */
 @layer components {
   .btn-primary {
-    @apply px-4 py-2 bg-primaryGreen text-textPrimaryColor rounded-3xl hover:bg-hoverGreen transition-colors font-poppins font-semibold lg:text-sm text-xs;
+    @apply px-4 py-2 bg-primaryGreen text-textPrimaryColor rounded-3xl hover:bg-hoverGreen transition-colors font-poppins font-semibold text-sm;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-transparent text-hoverGreen border-2 border-hoverGreen rounded-3xl hover:bg-hoverGreen hover:text-white transition-colors font-poppins font-semibold lg:text-sm text-xs;
+    @apply px-4 py-2 bg-transparent text-hoverGreen border-2 border-hoverGreen rounded-3xl hover:bg-hoverGreen hover:text-white transition-colors font-poppins font-semibold text-sm;
   }
   
 }
