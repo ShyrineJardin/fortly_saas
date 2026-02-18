@@ -479,7 +479,7 @@ export default function BusinessService() {
                 <div className="flex gap-4">
                   {service.image ? (
                     <img 
-                      src={`http://localhost:5000${service.image}`}
+                      src={service.image}
                       alt={service.name}
                       className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0 object-cover" 
                     />
@@ -1014,8 +1014,8 @@ export default function BusinessService() {
                       <img 
                         src={typeof serviceForm.image === 'string' && serviceForm.image.startsWith('http') 
                           ? serviceForm.image 
-                          : typeof serviceForm.image === 'string' && serviceForm.image.startsWith('/uploads')
-                          ? `http://localhost:5000${serviceForm.image}`
+                          : typeof serviceForm.image === 'string'
+                          ? serviceForm.image
                           : URL.createObjectURL(serviceForm.image as any)
                         }
                         alt="Service preview" 

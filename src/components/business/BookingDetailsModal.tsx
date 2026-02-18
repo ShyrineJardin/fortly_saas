@@ -153,7 +153,7 @@ export default function BookingDetailsModal({ booking, onClose, onChat, onUpdate
             <div className="flex items-start gap-4">
               {booking.Service?.image && (
                 <img 
-                  src={`http://localhost:5000${booking.Service.image}`}
+                  src={booking.Service.image}
                   alt={booking.Service.name}
                   className="w-20 h-20 rounded-lg object-cover"
                 />

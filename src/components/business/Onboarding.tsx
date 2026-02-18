@@ -61,7 +61,7 @@ export default function Onboarding() {
         
         // Set logo preview if exists
         if (business.logo) {
-          setLogoPreview(`http://localhost:5000${business.logo}`)
+          setLogoPreview(business.logo)
         }
       } catch (err) {
         console.error('Error fetching user data:', err)

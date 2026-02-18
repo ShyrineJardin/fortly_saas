@@ -33,7 +33,7 @@ interface BusinessChatProps {
 
 export default function BusinessChat({ 
   businessSlug,
-  apiBaseUrl = 'http://localhost:5000/api' 
+  apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api'
 }: BusinessChatProps) {
   const location = useLocation();
   const { pathname } = location;

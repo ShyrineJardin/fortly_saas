@@ -294,7 +294,7 @@ export default function Confirmation() {
                         <div className='flex items-center justify-center mb-3'>
                             {businessData?.logo ? (
                                 <img 
-                                    src={`http://localhost:5000${businessData.logo}`} 
+                                    src={businessData.logo}
                                     alt={businessData.businessName} 
                                     className='w-20 h-20 rounded-full object-cover' 
                                 />

@@ -138,7 +138,7 @@ export default function BusinessGallery() {
           >
             {item.mediaType === 'video' ? (
               <video 
-                src={`http://localhost:5000${item.mediaUrl}`}
+                src={item.mediaUrl}
                 className="w-full h-auto object-cover" 
                 muted 
                 autoPlay 
@@ -147,7 +147,7 @@ export default function BusinessGallery() {
               />
             ) : (
               <img 
-                src={`http://localhost:5000${item.mediaUrl}`}
+                src={item.mediaUrl}
                 alt={item.caption || "Gallery post"} 
                 className="w-full h-auto object-cover" 
               />
@@ -199,7 +199,7 @@ export default function BusinessGallery() {
               <video 
                 ref={videoRef}
                 key={selectedMedia.mediaUrl} 
-                src={`http://localhost:5000${selectedMedia.mediaUrl}`}
+                src={selectedMedia.mediaUrl}
                 controls 
                 autoPlay 
                 loop
@@ -208,7 +208,7 @@ export default function BusinessGallery() {
               />
             ) : (
               <img 
-                src={`http://localhost:5000${selectedMedia.mediaUrl}`}
+                src={selectedMedia.mediaUrl}
                 className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black"
                 alt="Large view"
               />
