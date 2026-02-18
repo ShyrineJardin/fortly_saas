@@ -27,7 +27,8 @@ const WelcomeForm = ({
   userEmail, 
   setUserEmail, 
   onSubmit,
-  onSwitchToReturning
+  onSwitchToReturning,
+  isLoading 
 }: {
   userName: string;
   setUserName: (name: string) => void;
@@ -35,6 +36,7 @@ const WelcomeForm = ({
   setUserEmail: (email: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onSwitchToReturning: () => void;
+   isLoading: boolean;
 }) => (
   <div className="p-6 bg-gray-50 h-full flex flex-col justify-center">
     <div className="mb-3 text-center">
@@ -75,11 +77,12 @@ const WelcomeForm = ({
         />
       </div>
       
-      <button
+       <button
         type="submit"
-        className="w-full btn-primary"
+        disabled={isLoading}  // ADD THIS
+        className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Start Chatting 💬
+        {isLoading ? 'Starting Chat...' : 'Start Chatting 💬'}  {/* ADD THIS */}
       </button>
     </form>
     
@@ -190,6 +193,7 @@ export default function ChatWidget({
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const [notificationSound] = useState(new Audio('/notification.mp3'));
+  const [isSubmittingWelcome, setIsSubmittingWelcome] = useState(false);
 
   // Scroll to bottom function
   const scrollToBottom = () => {
@@ -339,10 +343,15 @@ export default function ChatWidget({
 
   const handleWelcomeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!userName.trim() || !userEmail.trim()) return;
+
+    setIsSubmittingWelcome(true);
     
-    if (userName.trim() && userEmail.trim()) {
       localStorage.setItem(`chat_${businessSlug}_name`, userName);
       localStorage.setItem(`chat_${businessSlug}_email`, userEmail);
+
+      setShowWelcomeForm(false);
       
       try {
         await axios.post(`${apiBaseUrl}/chat/send-client`, {
@@ -355,10 +364,10 @@ export default function ChatWidget({
         await loadMessages(userEmail);
       } catch (error) {
         console.error('Error sending initial message:', error);
+      }finally {
+        setIsSubmittingWelcome(false);
       }
-      
-      setShowWelcomeForm(false);
-    }
+    
   };
 
   const handleReturningSubmit = async (e: React.FormEvent) => {
@@ -384,11 +393,11 @@ export default function ChatWidget({
           setUserName(clientName);
           setUserEmail(returningEmail);
           
-          // Load messages
-          await loadMessages(returningEmail);
-          
           setShowReturningForm(false);
           setShowWelcomeForm(false);
+
+          // Load messages
+          await loadMessages(returningEmail);
         } else {
           // No messages found
           setReturningError("No conversation found with this email. Please start a new chat.");
@@ -637,6 +646,7 @@ export default function ChatWidget({
                   setUserEmail={setUserEmail}
                   onSubmit={handleWelcomeSubmit}
                   onSwitchToReturning={switchToReturningForm}
+                  isLoading={isSubmittingWelcome}
                 />
               </div>
             ) : showReturningForm ? (
@@ -760,6 +770,7 @@ export default function ChatWidget({
                 setUserEmail={setUserEmail}
                 onSubmit={handleWelcomeSubmit}
                 onSwitchToReturning={switchToReturningForm}
+                isLoading={isSubmittingWelcome}
               />
             </div>
           ) : showReturningForm ? (
