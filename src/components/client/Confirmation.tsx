@@ -14,11 +14,6 @@ export default function Confirmation() {
     const [businessData, setBusinessData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     
-    // Calendar sync states
-    const [calendarConnected, setCalendarConnected] = useState(false);
-    const [showCalendarOption, setShowCalendarOption] = useState(false);
-    const [connectingCalendar, setConnectingCalendar] = useState(false);
-    
     // Cancellation modal states
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
@@ -41,22 +36,6 @@ export default function Confirmation() {
         fetchBusinessData();
     }, [businessSlug]);
 
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('calendar') === 'connected') {
-            setCalendarConnected(true);
-            setShowCalendarOption(false);
-        }
-
-        if (calendarSync?.requiresClientAuth && calendarSync?.clientAuthUrl) {
-            setShowCalendarOption(true);
-        }
-
-        if (bookingData?.clientEmail) {
-            checkCalendarStatus();
-        }
-    }, [calendarSync, bookingData]);
-
     const fetchBusinessData = async () => {
         try {
             setLoading(true);
@@ -66,40 +45,6 @@ export default function Confirmation() {
             console.error('Error fetching business data:', error);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const checkCalendarStatus = async () => {
-        try {
-            const response = await clientCalendarAPI.checkStatus(bookingData.clientEmail);
-            if (response.data.connected) {
-                setCalendarConnected(true);
-                setShowCalendarOption(false);
-            }
-        } catch (error) {
-            console.error('Error checking calendar status:', error);
-        }
-    };
-
-    const handleConnectCalendar = async () => {
-        try {
-            setConnectingCalendar(true);
-            
-            if (calendarSync?.clientAuthUrl) {
-                window.location.href = calendarSync.clientAuthUrl;
-                return;
-            }
-
-            const response = await clientCalendarAPI.getAuthUrl(
-                bookingData.clientEmail,
-                bookingData.id
-            );
-
-            window.location.href = response.data.authUrl;
-        } catch (error) {
-            console.error('Error getting auth URL:', error);
-            alert('Failed to connect calendar. Please try again.');
-            setConnectingCalendar(false);
         }
     };
 

@@ -3,7 +3,7 @@ import { FaChevronLeft, FaChevronRight, FaCalendar } from "react-icons/fa6";
 import BookingPolicy from "../shared/BookingPolicy";
 import ServiceCard from "../shared/ServiceCard";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { authAPI, bookingsAPI } from "../../utils/api";
+import { authAPI, bookingsAPI,  businessAPI} from "../../utils/api";
 
 export default function BookingPage() {
   const location = useLocation();
@@ -52,11 +52,11 @@ export default function BookingPage() {
   }, [selectedDate, businessData, selectedService]);
 
   const loadBusinessData = async () => {
-    try {
+  try {
       setLoading(true);
-      const response = await authAPI.getMe();
+      const response = await businessAPI.getBySlug(businessSlug || '');
       const business = response.data.business;
-      
+
       setBusinessData(business);
       setBookingPolicy({
         title: business.bookingPolicyTitle || "Booking Policy",
