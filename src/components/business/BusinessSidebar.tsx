@@ -172,7 +172,7 @@ export default function BusinessSidebar() {
         businessName: business.businessName || '',
         ownerName: business.ownerName || '',
         logo: null,
-        logoPreview: business.logo ? `http://localhost:5000${business.logo}` : '',
+        logoPreview: business.logo || '',
         phone: business.phone || '',
         email: business.email || '',
         facebook: business.facebook || '',

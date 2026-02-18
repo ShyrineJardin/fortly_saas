@@ -224,7 +224,7 @@ export default function BusinessCalendar() {
               </div>
               {booking.Service?.image && (
                 <img 
-                  src={`http://localhost:5000${booking.Service.image}`}
+                  src={booking.Service.image}
                   alt={booking.Service.name}
                   className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                 />

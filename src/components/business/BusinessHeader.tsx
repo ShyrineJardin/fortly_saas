@@ -87,7 +87,7 @@ export default function BusinessHeader() {
                 <div className="flex items-center gap-3">
                     {businessData.logo ? (
                       <img 
-                        src={`http://localhost:5000${businessData.logo}`} 
+                        src={businessData.logo}
                         alt={businessData.businessName}
                         className="w-10 h-10 rounded-full object-cover"
                       />

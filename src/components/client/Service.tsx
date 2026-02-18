@@ -4,6 +4,7 @@ import { CiCircleChevRight } from "react-icons/ci";
 import BookingPolicy from "../shared/BookingPolicy";
 import ServiceCard from "../shared/ServiceCard";
 import { useParams } from "react-router-dom";
+import { businessAPI } from '../../utils/api';
 
 interface Service {
   id: string;
@@ -54,21 +55,10 @@ export default function Service() {
       console.log('Loading business with slug:', businessSlug);
       
       // Fetch business data by slug (public route)
-      const response = await fetch(`http://localhost:5000/api/business/${businessSlug}`);
+      const response = await businessAPI.getBySlug(businessSlug || '');
+      const businessData = response.data.business;
       
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API Error:', errorData);
-        throw new Error(errorData.message || 'Failed to load business data');
-      }
-
-      const data = await response.json();
-      console.log('Loaded business data:', data);
-      
-      const businessData = data.business;
-      
+     
       if (!businessData) {
         throw new Error('Business not found');
       }
@@ -136,7 +126,7 @@ export default function Service() {
                 duration={service.duration}
                 price={service.price}
                 description={service.description}
-                image={service.image ? `http://localhost:5000${service.image}` : undefined}
+                image={service.image}
                 showArrow={true}
               />
             ))}
