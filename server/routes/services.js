@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
+const { cloudinary, uploadLogo } = require('../config/cloudinary');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs')
@@ -69,7 +70,7 @@ router.get('/my-services', authMiddleware, async (req, res) => {
 });
 
 // Create service
-router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
+router.post('/', authMiddleware, uploadLogo.single('image'), async (req, res) => {
   try {
     const { name, description, price, duration } = req.body;
 
@@ -82,15 +83,11 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
     };
 
     if (req.file) {
-      serviceData.image = '/uploads/services/' + req.file.filename;
+      serviceData.image = req.file.path; 
     }
 
     const service = await db.Service.create(serviceData);
-
-    res.status(201).json({ 
-      message: 'Service created successfully',
-      service 
-    });
+    res.status(201).json({ message: 'Service created successfully', service });
   } catch (error) {
     console.error('Create service error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -98,7 +95,7 @@ router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
 });
 
 // Update service
-router.put('/:id', authMiddleware, upload.single('image'), async (req, res) => {
+router.put('/:id', authMiddleware, uploadLogo.single('image'), async (req, res) => {
   try {
     const { name, description, price, duration, isActive } = req.body;
 
@@ -119,15 +116,11 @@ router.put('/:id', authMiddleware, upload.single('image'), async (req, res) => {
     };
 
     if (req.file) {
-      updateData.image = '/uploads/services/' + req.file.filename;
+      updateData.image = req.file.path; 
     }
 
     await service.update(updateData);
-
-    res.json({ 
-      message: 'Service updated successfully',
-      service 
-    });
+    res.json({ message: 'Service updated successfully', service });
   } catch (error) {
     console.error('Update service error:', error);
     res.status(500).json({ message: 'Server error' });
