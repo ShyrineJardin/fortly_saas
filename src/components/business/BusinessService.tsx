@@ -34,6 +34,8 @@ interface BusinessHour {
 
 export default function BusinessService() {
   const [loading, setLoading] = useState(true);
+  const [savingService, setSavingService] = useState(false);
+  const [savingPolicy, setSavingPolicy] = useState(false);
   const [error, setError] = useState('');
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -223,6 +225,8 @@ export default function BusinessService() {
 
   const handlePolicySave = async () => {
     try {
+      setSavingPolicy(true);
+
       await businessAPI.updateBookingPolicy({
         title: policyForm.title,
         description: policyForm.description,
@@ -233,6 +237,8 @@ export default function BusinessService() {
       setShowPolicyModal(false);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save booking policy');
+    } finally {
+      setSavingPolicy(false);
     }
   };
 
@@ -308,6 +314,7 @@ export default function BusinessService() {
 
   const handleServiceSave = async () => {
     try {
+      setSavingService(true);
       if (!serviceForm.durationValue || parseFloat(serviceForm.durationValue) <= 0) {
         setError('Please enter a valid duration');
         return;
@@ -339,6 +346,9 @@ export default function BusinessService() {
       await loadData();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save service');
+    }
+    finally {
+    setSavingService(false); 
     }
   };
 
@@ -976,9 +986,10 @@ export default function BusinessService() {
               </button>
               <button
                 onClick={handlePolicySave}
-                className="flex-1 px-4 py-2 btn-primary"
+                disabled={savingPolicy}
+                className="flex-1 px-4 py-2 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save
+                {savingPolicy ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -1129,9 +1140,10 @@ export default function BusinessService() {
               </button>
               <button
                 onClick={handleServiceSave}
-                className="flex-1 px-4 py-2 btn-primary"
+                disabled={savingService}
+                className="flex-1 px-4 py-2 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save
+                {savingService ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
