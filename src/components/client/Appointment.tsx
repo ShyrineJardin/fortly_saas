@@ -167,7 +167,7 @@ const BookingCard = ({
               {booking.Service.title}
             </h3>
             <p className="text-sm text-gray-500">
-              {booking.Service.duration} mins • ${booking.Service.price}
+              {booking.Service.duration} • {booking.Service.price}
             </p>
           </div>
 
