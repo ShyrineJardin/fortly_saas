@@ -3,6 +3,14 @@ const router = express.Router();
 const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs')
+
+// Ensure upload directory exists
+const uploadDir = 'uploads/services/';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -14,7 +22,17 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only images are allowed'));
+    }
+    cb(null, true);
+  }
+});
+
 
 // Get all services for a business (public)
 router.get('/business/:slug', async (req, res) => {
