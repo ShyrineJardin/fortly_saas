@@ -49,13 +49,20 @@ router.post('/', authMiddleware, uploadGallery.single('media'), async (req, res)
 
     const { caption, order } = req.body;
     
-    // Cloudinary provides the URL and resource type
-    const mediaType = req.file.resource_type === 'video' ? 'video' : 'image';
+    const isVideo = req.file.mimetype.startsWith('video/');  // ← more reliable than resource_type
+
+    // Fix URL: Cloudinary returns /image/upload/ even for videos
+    let mediaUrl = req.file.path;
+    if (isVideo) {
+      mediaUrl = req.file.path
+        .replace('/image/upload/', '/video/upload/')
+        .replace(/\.[^/.]+$/, '.mp4');
+    }
 
     const galleryItem = await db.Gallery.create({
       businessId: req.business.id,
-      mediaUrl: req.file.path, // Cloudinary URL
-      mediaType: mediaType,
+      mediaUrl: mediaUrl,        // ← was req.file.path (broken for videos)
+      mediaType: isVideo ? 'video' : 'image',  // ← was req.file.resource_type which is unreliable
       caption: caption || '',
       order: order || 0
     });

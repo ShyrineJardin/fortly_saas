@@ -12,10 +12,13 @@ cloudinary.config({
 // Configure Cloudinary storage for gallery images/videos
 const galleryStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'fortly/gallery',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm'],
-    resource_type: 'auto', // Automatically detect image or video
+  params: async (req, file) => {
+    const isVideo = file.mimetype.startsWith('video/');
+    return {
+      folder: 'fortly/gallery',
+      resource_type: isVideo ? 'video' : 'image',
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'avi', 'webm'],
+    };
   }
 });
 
