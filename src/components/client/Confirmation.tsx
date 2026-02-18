@@ -183,9 +183,6 @@ export default function Confirmation() {
                         <p className="text-gray-500">Loading...</p>
                     </div>
                 </main>
-                <footer className='bg-footerBackground mt-auto'>
-                    <Footer />
-                </footer>
             </div>
         );
     }
