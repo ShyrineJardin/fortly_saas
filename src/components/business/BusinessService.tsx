@@ -308,9 +308,13 @@ export default function BusinessService() {
 
   const handleServiceSave = async () => {
     try {
-      // Validate duration
       if (!serviceForm.durationValue || parseFloat(serviceForm.durationValue) <= 0) {
         setError('Please enter a valid duration');
+        return;
+      }
+
+      if (!serviceForm.name) {
+        setError('Please enter a service name');
         return;
       }
 
@@ -318,8 +322,8 @@ export default function BusinessService() {
       formData.append('name', serviceForm.name);
       formData.append('description', serviceForm.description);
       formData.append('price', serviceForm.price);
-      formData.append('duration', serviceForm.duration);
-      
+      formData.append('duration', `${serviceForm.durationValue} ${serviceForm.durationUnit}`); // ← was serviceForm.duration (often empty)
+
       if (serviceForm.image && typeof serviceForm.image !== 'string') {
         formData.append('image', serviceForm.image);
       }
@@ -331,6 +335,7 @@ export default function BusinessService() {
       }
 
       setShowServiceModal(false);
+      setError('');
       await loadData();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save service');
