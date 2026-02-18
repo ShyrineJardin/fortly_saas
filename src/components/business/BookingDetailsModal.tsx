@@ -164,10 +164,10 @@ export default function BookingDetailsModal({ booking, onClose, onChat, onUpdate
                   <p className="text-sm text-gray-600 mt-1">{booking.Service.description}</p>
                 )}
                 {booking.Service?.duration && (
-                  <p className="text-sm text-gray-500 mt-2">Duration: {booking.Service.duration} minutes</p>
+                  <p className="text-sm text-gray-500 mt-2">Duration: {booking.Service.duration}</p>
                 )}
                 {booking.Service?.price && (
-                  <p className="text-lg font-bold text-hoverGreen mt-2">${booking.Service.price}</p>
+                  <p className="text-lg font-bold text-hoverGreen mt-2">{booking.Service.price}</p>
                 )}
               </div>
             </div>
