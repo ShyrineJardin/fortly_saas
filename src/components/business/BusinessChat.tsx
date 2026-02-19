@@ -76,14 +76,26 @@ export default function BusinessChat({
   }, [isOpen]);
 
   useEffect(() => {
-    const handleOpenChat = () => setIsOpen(true);
+    const handleOpenChat = async (e: Event) => { 
+      const customEvent = e as CustomEvent;
+      const clientEmail = customEvent.detail?.clientEmail;
+      
+      setIsOpen(true);
+      await loadClients();
+      
+      if (clientEmail) {
+        setActiveChat(clientEmail);
+        setIsInitialLoad(true);
+        loadMessages(clientEmail);
+      }
+    };
+    
     window.addEventListener('openChat', handleOpenChat);
     return () => window.removeEventListener('openChat', handleOpenChat);
-  }, []);
+  }, [businessSlug]);
 
   // Initialize Socket.IO
   useEffect(() => {
-    // ✅ Use dynamic URL
     const socketUrl = apiBaseUrl.replace('/api', '');
     socketRef.current = io(socketUrl);
   
