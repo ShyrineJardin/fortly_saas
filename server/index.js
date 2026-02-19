@@ -4,7 +4,6 @@ const path = require('path');
 const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
-const nodemailer = require('nodemailer');
 const db = require('./config/database');
 
 // Import Sequelize and DataTypes from db
@@ -40,33 +39,14 @@ const io = socketIo(server, {
   }
 });
 
-// Configure Nodemailer
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
-
-// Set up associations (make sure Business model is available in db)
+// Set up associations
 if (db.Business) {
   db.Business.hasMany(ClientCalendarToken, { foreignKey: 'businessId', as: 'clientTokens' });
   ClientCalendarToken.belongsTo(db.Business, { foreignKey: 'businessId', as: 'Business' });
 }
 
-// Verify email configuration on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('❌ Email configuration error:', error);
-  } else {
-    console.log('✅ Email server is ready to send messages');
-  }
-});
-
-// Make io and transporter accessible in routes
+// Make io accessible in routes
 app.set('io', io);
-app.set('emailTransporter', transporter);
 
 // Middleware
 app.use(cors({
@@ -84,14 +64,12 @@ const connectedUsers = new Map();
 io.on('connection', (socket) => {
   console.log('🔌 New client connected:', socket.id);
 
-  // Business joins their room
   socket.on('join-business', (businessSlug) => {
     socket.join(`business-${businessSlug}`);
     connectedUsers.set(socket.id, { type: 'business', businessSlug });
     console.log(`👔 Business ${businessSlug} joined room`);
   });
 
-  // Client joins their room
   socket.on('join-client', ({ businessSlug, clientEmail }) => {
     const roomName = `client-${businessSlug}-${clientEmail}`;
     socket.join(roomName);
@@ -99,7 +77,6 @@ io.on('connection', (socket) => {
     console.log(`👤 Client ${clientEmail} joined room for business ${businessSlug}`);
   });
 
-  // Handle typing indicators
   socket.on('typing', (data) => {
     if (data.sender === 'business') {
       io.to(`client-${data.businessSlug}-${data.clientEmail}`).emit('typing', { 
@@ -164,5 +141,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📧 Email configured: ${process.env.EMAIL_USER}`);
+  console.log(`📧 Resend email configured`);
 });

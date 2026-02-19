@@ -54,6 +54,8 @@ export default function BusinessChat({
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const [notificationSound] = useState(new Audio('/notification.mp3')); 
+  const [isClientTyping, setIsClientTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentMessages = chatMessages[activeChat || ''] || [];
 
@@ -127,6 +129,12 @@ export default function BusinessChat({
         });
       }
     });
+
+    socketRef.current.on('typing', (data) => {
+      if (data.sender === 'client') {
+        setIsClientTyping(data.isTyping);
+      }
+    });
   
     // Request notification permission
     if (Notification.permission === 'default') {
@@ -136,6 +144,7 @@ export default function BusinessChat({
     return () => {
       if (socketRef.current) {
         socketRef.current.off('new-message');
+        socketRef.current.off('typing');
         socketRef.current.disconnect();
       }
     };
@@ -335,6 +344,28 @@ export default function BusinessChat({
       handleSendMessage();
     }
   };
+
+  const handleTyping = () => {
+    if (socketRef.current && activeChat) {
+      socketRef.current.emit('typing', {
+        sender: 'business',
+        businessSlug,
+        clientEmail: activeChat,
+        isTyping: true
+      });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socketRef.current?.emit('typing', {
+          sender: 'business',
+          businessSlug,
+          clientEmail: activeChat,
+          isTyping: false
+        });
+      }, 1500);
+    }
+  };
+
 
   const openClientChat = async (clientEmail: string) => {
     setActiveChat(clientEmail);
@@ -584,6 +615,18 @@ export default function BusinessChat({
                       </div>
                     ))
                   )}
+
+                  {isClientTyping && (
+                    <div className="flex items-start mb-3">
+                      <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
+                        <div className="flex gap-1 items-center h-4">
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -598,7 +641,7 @@ export default function BusinessChat({
                     <input
                       type="text"
                       value={message}
-                      onChange={(e) => setMessage(e.target.value)}
+                      onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
                       onKeyPress={handleKeyPress}
                       placeholder="Message"
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
@@ -741,6 +784,18 @@ export default function BusinessChat({
                     </div>
                   ))
                 )}
+
+                {isClientTyping && (
+                  <div className="flex items-start mb-3">
+                    <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
+                      <div className="flex gap-1 items-center h-4">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -755,7 +810,7 @@ export default function BusinessChat({
                   <input
                     type="text"
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
                     onKeyPress={handleKeyPress}
                     placeholder="Message"
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
