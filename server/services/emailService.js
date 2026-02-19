@@ -133,8 +133,8 @@ class EmailService {
   // ==================== BOOKING EMAILS ====================
 
   async sendBookingConfirmation(booking, business, service) {
-    try {
-      await sendEmail({
+    const results = await Promise.allSettled([
+      sendEmail({
         to: booking.clientEmail,
         subject: `Booking Confirmation - ${business.businessName}`,
         html: `
@@ -201,18 +201,8 @@ class EmailService {
             </div>
           </div>
         `
-      });
-      console.log('✅ Confirmation email sent to client:', booking.clientEmail);
-      await this.sendBusinessBookingNotification(booking, business, service);
-    } catch (error) {
-      console.error('❌ Error sending confirmation email:', error);
-      throw error;
-    }
-  }
-
-  async sendBusinessBookingNotification(booking, business, service) {
-    try {
-      await sendEmail({
+      }),
+      sendEmail({
         to: business.email,
         subject: `New Booking - ${booking.clientName}`,
         html: `
@@ -283,16 +273,25 @@ class EmailService {
             </div>
           </div>
         `
-      });
+      })
+    ]);
+
+    if (results[0].status === 'fulfilled') {
+      console.log('✅ Confirmation email sent to client:', booking.clientEmail);
+    } else {
+      console.error('❌ Client confirmation email failed:', results[0].reason?.message);
+    }
+
+    if (results[1].status === 'fulfilled') {
       console.log('✅ Business notification sent to:', business.email);
-    } catch (error) {
-      console.error('❌ Error sending business notification:', error);
+    } else {
+      console.error('❌ Business confirmation email failed:', results[1].reason?.message);
     }
   }
 
   async sendCancellationNotification(booking, business, service, reason, cancelledBy) {
-    try {
-      await sendEmail({
+    const results = await Promise.allSettled([
+      sendEmail({
         to: booking.clientEmail,
         subject: `Appointment Cancelled - ${business.businessName}`,
         html: `
@@ -349,10 +348,8 @@ class EmailService {
             </div>
           </div>
         `
-      });
-      console.log('✅ Cancellation email sent to client:', booking.clientEmail);
-
-      await sendEmail({
+      }),
+      sendEmail({
         to: business.email,
         subject: `Appointment Cancelled - ${booking.clientName}`,
         html: `
@@ -411,11 +408,19 @@ class EmailService {
             </div>
           </div>
         `
-      });
+      })
+    ]);
+
+    if (results[0].status === 'fulfilled') {
+      console.log('✅ Cancellation email sent to client:', booking.clientEmail);
+    } else {
+      console.error('❌ Client cancellation email failed:', results[0].reason?.message);
+    }
+
+    if (results[1].status === 'fulfilled') {
       console.log('✅ Cancellation email sent to business:', business.email);
-    } catch (error) {
-      console.error('❌ Error sending cancellation emails:', error);
-      throw error;
+    } else {
+      console.error('❌ Business cancellation email failed:', results[1].reason?.message);
     }
   }
 }
