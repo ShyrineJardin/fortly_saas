@@ -3,16 +3,7 @@ const router = express.Router();
 const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const availabilityService = require('../services/availabilityService');
-
-// Get email service
-let emailService = null;
-const getEmailService = (req) => {
-  if (!emailService) {
-    const transporter = req.app.get('emailTransporter');
-    emailService = require('../services/emailService')(transporter);
-  }
-  return emailService;
-};
+const emailService = require('../services/emailService')();
 
 // ==================== CREATE BOOKING ====================
 router.post('/', async (req, res) => {
@@ -110,14 +101,9 @@ router.post('/', async (req, res) => {
     });
 
     // Send emails after response (truly non-blocking)
-    try {
-      const emailSvc = getEmailService(req);
-      emailSvc.sendBookingConfirmation(booking, business, service)
-        .then(() => console.log('✅ Confirmation emails sent'))
-        .catch(err => console.error('❌ Email failed:', err.message));
-    } catch (emailError) {
-      console.error('❌ Email init failed:', emailError.message);
-    }
+    emailService.sendBookingConfirmation(booking, business, service)
+      .then(() => console.log('✅ Confirmation emails sent'))
+      .catch(err => console.error('❌ Email failed:', err.message));
 
   } catch (error) {
     console.error('❌ Create booking error:', error);
@@ -153,8 +139,7 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
     // Send status update email after response (non-blocking)
     try {
       const business = await db.Business.findByPk(req.business.id);
-      const emailSvc = getEmailService(req);
-      emailSvc.sendBookingStatusUpdate(booking, business, booking.Service, oldStatus, status)
+      emailService.sendBookingStatusUpdate(booking, business, booking.Service, oldStatus, status)
         .then(() => console.log('📧 Status update email sent'))
         .catch(err => console.error('⚠️ Email failed:', err.message));
     } catch (emailError) {
@@ -259,8 +244,7 @@ router.put('/:id/cancel', async (req, res) => {
 
     // Send cancellation emails after response (non-blocking)
     try {
-      const emailSvc = getEmailService(req);
-      emailSvc.sendCancellationNotification(booking, booking.Business, booking.Service, reason, cancelledBy || 'client')
+      emailService.sendCancellationNotification(booking, booking.Business, booking.Service, reason, cancelledBy || 'client')
         .then(() => console.log('✅ Cancellation emails sent'))
         .catch(err => console.error('⚠️ Email failed:', err.message));
     } catch (emailError) {
