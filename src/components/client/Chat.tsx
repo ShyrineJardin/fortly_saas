@@ -194,6 +194,9 @@ export default function ChatWidget({
   const socketRef = useRef<Socket | null>(null);
   const [notificationSound] = useState(new Audio('/notification.mp3'));
   const [isSubmittingWelcome, setIsSubmittingWelcome] = useState(false);
+  const [isBusinessTyping, setIsBusinessTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
 
   // Scroll to bottom function
   const scrollToBottom = () => {
@@ -264,6 +267,12 @@ export default function ChatWidget({
           });
         }
       });
+
+      socketRef.current.on('typing', (data) => {
+        if (data.sender === 'business') {
+          setIsBusinessTyping(data.isTyping);
+        }
+      });
     
       // Request notification permission
       if (Notification.permission === 'default') {
@@ -274,6 +283,7 @@ export default function ChatWidget({
     return () => {
       if (socketRef.current) {
         socketRef.current.off('new-message');
+        socketRef.current.off('typing');
         socketRef.current.disconnect();
       }
     };
@@ -294,6 +304,29 @@ export default function ChatWidget({
     } catch (error) {
       console.error('Error fetching business details:', error);
       setBusinessName("Business Name");
+    }
+  };
+
+  const handleTyping = () => {
+    if (socketRef.current && userEmail) {
+      socketRef.current.emit('typing', {
+        sender: 'client',
+        businessSlug,
+        clientEmail: userEmail,
+        clientName: userName,
+        isTyping: true
+      });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socketRef.current?.emit('typing', {
+          sender: 'client',
+          businessSlug,
+          clientEmail: userEmail,
+          clientName: userName,
+          isTyping: false
+        });
+      }, 1500);
     }
   };
 
@@ -697,6 +730,18 @@ export default function ChatWidget({
                       </div>
                     ))
                   )}
+
+                  {isBusinessTyping && (
+                    <div className="flex items-start mb-3">
+                      <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
+                        <div className="flex gap-1 items-center h-4">
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -711,7 +756,7 @@ export default function ChatWidget({
                     <input
                       type="text"
                       value={message}
-                      onChange={(e) => setMessage(e.target.value)}
+                      onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
                       onKeyPress={handleKeyPress}
                       placeholder="Message"
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
@@ -821,6 +866,18 @@ export default function ChatWidget({
                     </div>
                   ))
                 )}
+
+                {isBusinessTyping && (
+                  <div className="flex items-start mb-3">
+                    <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
+                      <div className="flex gap-1 items-center h-4">
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -835,7 +892,7 @@ export default function ChatWidget({
                   <input
                     type="text"
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
                     onKeyPress={handleKeyPress}
                     placeholder="Message"
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
