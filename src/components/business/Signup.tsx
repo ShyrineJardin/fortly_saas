@@ -81,7 +81,7 @@ export default function Signup() {
 
   const handleGoogleSignIn = () => {
     const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-    window.location.href = `${apiUrl}/api/auth/google`;
+    window.location.href = `${apiUrl}/auth/google`;
   };
 
   const handleChange = (e) => {
