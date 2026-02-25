@@ -27,59 +27,48 @@ import BusinessLayout from "./components/layout/BusinessLayout"
 import BusinessSidebar from "./components/business/BusinessSidebar"
 import BusinessTopTabs from "./components/business/BusinessTopTabs"
 
+import { useBusinessMeta } from "./hooks/useBusinessMeta"
+
 // Unified Client Layout (for gallery, services, reviews, booking)
 function UnifiedClientLayout() {
   const location = useLocation()
   const { pathname } = location
   
-  // Check if current route is booking or confirmation
   const isBookingFlow = pathname.includes('/booking')
   const isConfirmationFlow = pathname.includes('/confirmation')
   
-  // Extract businessSlug from pathname
   const businessSlug = pathname.split('/')[1] || ""
-  
-  // Get client email from localStorage (same as chat)
-  const clientEmail = localStorage.getItem(`chat_${businessSlug}_email`) || ""
-  
-  // State for mobile actions
-  const [mobileAction, setMobileAction] = useState<'chat' | 'appointment' | null>(null)
+  const clientEmail = localStorage.getItem(`chat_${businessSlug}_email`) 
+    || localStorage.getItem(`booking_${businessSlug}_email`) 
+    || ""
   
   return (
     <div className='flex flex-col min-h-screen'>
-      {/* Mobile Sidebar - STAYS MOUNTED */}
       <div className='lg:hidden'>
         <ClientSidebar />
       </div>
       
-      
       <div className='flex flex-1'>
-        {/* Desktop Sidebar - STAYS MOUNTED */}
         <aside className='hidden lg:block w-80 p-6 overflow-y-auto'>
           <ClientSidebar />
         </aside>
         
         <main className='flex-1 p-4 lg:p-6 overflow-y-auto'>
-          {/* Conditionally render TopTabs with smooth transition */}
           {!isBookingFlow && !isConfirmationFlow && (
             <div className="transition-all duration-300 ease-in-out">
               <TopTabs />
             </div>
           )}
-          
-          {/* Page content with fade transition */}
           <div className="transition-opacity duration-200">
             <Outlet />
           </div>
         </main>
       </div>
       
-      {/* Footer - STAYS MOUNTED */}
       <footer className='bg-footerBackground mt-auto'>
         <Footer />
       </footer>
 
-      {/* Appointment Widget - Only show when not on confirmation page */}
       {!isConfirmationFlow && (
         <AppointmentWidget 
           businessSlug={businessSlug}
@@ -87,7 +76,6 @@ function UnifiedClientLayout() {
         />
       )}
 
-      {/* Chat Widget - STAYS MOUNTED */}
       <ChatWidget 
         businessSlug={businessSlug} 
         apiBaseUrl={process.env.REACT_APP_API_URL || "http://localhost:5000/api"}
@@ -98,11 +86,11 @@ function UnifiedClientLayout() {
 
 // Business pages wrapper
 function BusinessPageLayout() {
+  // ✅ Set tab title and favicon to business name and logo
+  useBusinessMeta()
 
   const location = useLocation()
   const { pathname } = location
-  
-  // Check if current route is calendar
   const isCalendarPage = pathname.includes('/calendar')
 
   return (
@@ -138,7 +126,7 @@ export default function App() {
           <Route path="calendar" element={<BusinessCalendar />} />
         </Route>
 
-        {/* Client Routes - UNIFIED LAYOUT (for main pages) */}
+        {/* Client Routes */}
         <Route path="/:businessSlug" element={<UnifiedClientLayout />}>
           <Route index element={<Navigate to="gallery" replace />} />
           <Route path="gallery" element={<GalleryGrid />} />
@@ -147,7 +135,7 @@ export default function App() {
           <Route path="booking" element={<BookingPage />} />
         </Route>
 
-        {/* Confirmation Page - SEPARATE LAYOUT (uses ClientLayout internally) */}
+        {/* Confirmation Page */}
         <Route path="/:businessSlug/confirmation" element={<ConfirmationPage />} />
 
         {/* Default redirect */}
