@@ -3,7 +3,7 @@ import { FaChevronLeft, FaChevronRight, FaCalendar } from "react-icons/fa6";
 import BookingPolicy from "../shared/BookingPolicy";
 import ServiceCard from "../shared/ServiceCard";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
-import { authAPI, bookingsAPI,  businessAPI} from "../../utils/api";
+import { authAPI, bookingsAPI, businessAPI } from "../../utils/api";
 
 export default function BookingPage() {
   const location = useLocation();
@@ -17,7 +17,6 @@ export default function BookingPage() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [error, setError] = useState("");
   const [takenTimeSlots, setTakenTimeSlots] = useState<any[]>([]);
-
   const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -52,7 +51,7 @@ export default function BookingPage() {
   }, [selectedDate, businessData, selectedService]);
 
   const loadBusinessData = async () => {
-  try {
+    try {
       setLoading(true);
       const response = await businessAPI.getBySlug(businessSlug || '');
       const business = response.data.business;
@@ -104,21 +103,21 @@ export default function BookingPage() {
 
   const isDateSelectable = (day: number | null) => {
     if (!day || !businessData) return false;
-    
+
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     if (date < today) return false;
-    
+
     const minDate = new Date(today);
     minDate.setDate(today.getDate() + minAdvanceDays);
-    
+
     if (date < minDate) return false;
-    
+
     const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
     const daySchedule = businessData?.schedules?.find((s: any) => s.dayOfWeek === dayOfWeek);
-    
+
     return daySchedule?.enabled || false;
   };
 
@@ -143,7 +142,6 @@ export default function BookingPage() {
     }
 
     try {
-      // ✅ Set submitting state - this will hide sidebar
       setSubmitting(true);
 
       const selectedSlot = availableTimeSlots.find(slot => slot.display === selectedTime);
@@ -164,22 +162,24 @@ export default function BookingPage() {
         notes: formData.message,
       };
 
-      console.log('📤 Submitting booking:', bookingData);
-
       const response = await bookingsAPI.create(bookingData);
-
       console.log('✅ Booking created:', response.data);
 
-      navigate(`/${businessSlug}/confirmation`, { 
-        state: { 
+      // ✅ Save client email so AppointmentWidget shows up immediately
+      localStorage.setItem(`booking_${businessSlug}_email`, formData.emailAddress);
+      window.dispatchEvent(new Event('clientEmailUpdated'));
+
+      // ✅ Only navigate once
+      navigate(`/${businessSlug}/confirmation`, {
+        state: {
           selectedService: selectedService,
           booking: response.data.booking,
-          bookingDetails: { 
-            date: selectedDate.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
+          bookingDetails: {
+            date: selectedDate.toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
             }),
             time: selectedTime,
             ...formData
@@ -218,17 +218,17 @@ export default function BookingPage() {
     const month = currentMonth.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    
+
     const days: (number | null)[] = [];
-    
+
     for (let i = 0; i < firstDay; i++) {
       days.push(null);
     }
-    
+
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
-    
+
     return days;
   };
 
@@ -245,7 +245,6 @@ export default function BookingPage() {
     return <Navigate to={`/${businessSlug}/services`} replace />;
   }
 
-  // Clean loading screen during submission of booking
   if (submitting) {
     return (
       <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
@@ -280,7 +279,7 @@ export default function BookingPage() {
           </svg>
           <div>
             {error}
-            <button 
+            <button
               onClick={() => setError('')}
               className="ml-2 underline hover:no-underline"
             >
@@ -291,22 +290,22 @@ export default function BookingPage() {
       )}
 
       <div className="mb-6 border-b border-gray-100 w-full pb-4">
-        <button 
+        <button
           onClick={handleBackClick}
           className="flex items-center gap-2 hover:opacity-70 transition"
         >
-          {FaChevronLeft ({size:16})}
+          {FaChevronLeft({ size: 16 })}
           <span className="text-sm lg:text-base font-semibold">Booking details</span>
         </button>
       </div>
 
-      <BookingPolicy 
+      <BookingPolicy
         title={bookingPolicy.title}
         description={bookingPolicy.description}
         policyList={bookingPolicy.policyList}
       />
 
-      <ServiceCard 
+      <ServiceCard
         id={selectedService.id}
         title={selectedService.title}
         duration={selectedService.duration}
@@ -316,28 +315,28 @@ export default function BookingPage() {
         showArrow={false}
       />
 
-      <div className="mb-6"> 
+      <div className="mb-6">
         <h2 className="font-semibold mb-4 lg:text-base text-sm">Select date and time</h2>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <div className="flex items-center justify-between mb-6">
-              <button 
-                onClick={previousMonth} 
+              <button
+                onClick={previousMonth}
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
               >
-                {FaChevronLeft ({className:"w-5 h-5 text-gray-600" })}
+                {FaChevronLeft({ className: "w-5 h-5 text-gray-600" })}
               </button>
-              
+
               <h3 className="text-base font-semibold text-gray-900">
                 {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </h3>
-              
-              <button 
-                onClick={nextMonth} 
+
+              <button
+                onClick={nextMonth}
                 className="p-2 hover:bg-gray-100 rounded-lg transition"
               >
-                {FaChevronRight ({className:"w-5 h-5 text-gray-600" })}
+                {FaChevronRight({ className: "w-5 h-5 text-gray-600" })}
               </button>
             </div>
 
@@ -359,7 +358,7 @@ export default function BookingPage() {
                 const isSelected = selectedDate?.toDateString() === date.toDateString();
                 const isToday = new Date().toDateString() === date.toDateString();
                 const isSelectable = isDateSelectable(day);
-                
+
                 return (
                   <button
                     key={day}
@@ -368,8 +367,8 @@ export default function BookingPage() {
                     className={`
                       aspect-square flex items-center justify-center text-sm rounded-lg font-medium
                       transition-all duration-200
-                      ${isSelected 
-                        ? 'bg-primaryGreen text-white shadow-md scale-105' 
+                      ${isSelected
+                        ? 'bg-primaryGreen text-white shadow-md scale-105'
                         : isToday
                         ? 'border-2 border-primaryGreen text-primaryGreen bg-green-50'
                         : isSelectable
@@ -388,7 +387,7 @@ export default function BookingPage() {
               <p className="text-xs text-gray-500 text-center">
                 🕐 Timezone: {businessData?.timezone || 'UTC'}
               </p>
-              
+
               {showAdvanceNotice && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-xs text-blue-800 text-center font-medium">
@@ -435,7 +434,7 @@ export default function BookingPage() {
 
       <div className="mb-6 bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="font-semibold mb-4 lg:text-base text-sm">Your Information</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block md:text-sm text-xs font-medium mb-2 text-gray-700">
@@ -524,7 +523,6 @@ export default function BookingPage() {
               By confirming, you agree to our <span className="font-semibold">Booking Policy</span>
             </label>
           </div>
-
 
           <button
             onClick={handleSubmit}
