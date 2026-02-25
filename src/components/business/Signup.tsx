@@ -130,7 +130,7 @@ export default function Signup() {
               {slugPreview && (
                 <p className="mt-2 text-xs text-gray-500">
                   Your page will be: <span className="font-medium text-emerald-600">
-                    fortly.com/{slugPreview}
+                    fortly.io/{slugPreview}
                   </span>
                 </p>
               )}

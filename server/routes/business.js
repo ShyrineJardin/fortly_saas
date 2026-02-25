@@ -55,6 +55,12 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([
       instagram,
       linkedin
     } = req.body;
+
+    const business = await db.Business.findByPk(req.business.id);
+
+    if (!business) {
+      return res.status(404).json({ message: 'Business not found' });
+    }
     
     const updateData = {
       ownerName,
@@ -71,59 +77,66 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([
       onboardingCompleted: true
     };
 
-    // If businessName is provided and different from temp name
-    if (businessName && businessName !== business.businessName) {
-      // Check if new business name is already taken
-      const existingBusiness = await db.Business.findOne({
-        where: { 
-          businessName,
-          id: { [db.Sequelize.Op.ne]: business.id }
-        }
-      });
+    if (businessName && businessName.trim()) {
+      // Only update if it's different from current name
+      if (businessName !== business.businessName) {
+        // Check if new business name is already taken by another business
+        const existingBusiness = await db.Business.findOne({
+          where: { 
+            businessName,
+            id: { [db.Sequelize.Op.ne]: business.id }
+          }
+        });
 
-      if (existingBusiness) {
-        return res.status(400).json({ message: 'Business name already taken' });
-      }
-
-      // Generate new slug
-      const baseSlug = businessName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      
-      let slug = baseSlug;
-      let counter = 1;
-      
-      let slugExists = await db.Business.findOne({ 
-        where: { 
-          slug,
-          id: { [db.Sequelize.Op.ne]: business.id }
+        if (existingBusiness) {
+          return res.status(400).json({ message: 'Business name already taken' });
         }
-      });
-      
-      while (slugExists) {
-        slug = `${baseSlug}-${counter}`;
-        slugExists = await db.Business.findOne({ 
+
+        // Generate new slug from business name
+        const baseSlug = businessName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        
+        let slug = baseSlug;
+        let counter = 1;
+        
+        // Check if slug exists
+        let slugExists = await db.Business.findOne({ 
           where: { 
             slug,
             id: { [db.Sequelize.Op.ne]: business.id }
           }
         });
-        counter++;
-      }
+        
+        // Make slug unique if needed
+        while (slugExists) {
+          slug = `${baseSlug}-${counter}`;
+          slugExists = await db.Business.findOne({ 
+            where: { 
+              slug,
+              id: { [db.Sequelize.Op.ne]: business.id }
+            }
+          });
+          counter++;
+        }
 
-      updateData.businessName = businessName;
-      updateData.slug = slug;
+        updateData.businessName = businessName;
+        updateData.slug = slug;
+      }
     }
 
+    // Handle logo upload
     if (req.files?.logo) {
       updateData.logo = req.files.logo[0].path; // Cloudinary URL
     }
 
+    // Update the business
     await db.Business.update(updateData, {
       where: { id: req.business.id }
     });
 
+    // Fetch updated business data
     const updatedBusiness = await db.Business.findByPk(req.business.id, {
       attributes: { exclude: ['password'] }
     });

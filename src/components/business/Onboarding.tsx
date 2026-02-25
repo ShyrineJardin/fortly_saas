@@ -79,6 +79,8 @@ export default function Onboarding() {
     })
   }
 
+  const slugPreview = generateSlugPreview(formData.businessName)
+
   const handleSelectCategory = (category: string) => {
     setFormData({ ...formData, category })
     setIsCategoryOpen(false)
@@ -109,25 +111,25 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
+
     // Validation
     if (!businessName.trim()) {
       setError('Business name is required')
       return
     }
-  
+
     if (!formData.ownerName.trim()) {
       setError('Owner name is required')
       return
     }
-  
+
     if (!formData.category) {
       setError('Please select a business category')
       return
     }
-  
+
     setLoading(true)
-  
+
     try {
       // Create FormData for file upload
       const data = new FormData()
@@ -138,15 +140,15 @@ export default function Onboarding() {
       data.append('location', formData.location)
       data.append('tagline', formData.tagline)
       data.append('description', formData.description)
-      
+
       if (formData.logo) {
         data.append('logo', formData.logo)
       }
-    
+
       const response = await businessAPI.completeOnboarding(data)
-      
+
       console.log('Onboarding completed:', response.data)
-      
+
       // Navigate to gallery or next step
       navigate('/business/gallery')
     } catch (err: any) {
@@ -229,9 +231,14 @@ export default function Onboarding() {
                 disabled={loading}
                 required
               />
-              <p className="mt-1 text-xs text-gray-500">
-                This will be used in your website URL: fortly.io/your-business-name
-              </p>
+              {/* Slug Preview */}
+              {slugPreview && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Your page will be: <span className="font-medium text-emerald-600">
+                    fortly.io/{slugPreview}
+                  </span>
+                </p>
+              )}
             </div>
 
             {/* Full Name Input */}
