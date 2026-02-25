@@ -1,6 +1,20 @@
 import { useEffect } from 'react'
-import { authAPI } from '../utils/api'
+import { authAPI, businessAPI } from '../utils/api'
 
+function setFavicon(url) {
+  // Remove all existing favicon tags to avoid caching issues
+  const existingFavicons = document.querySelectorAll("link[rel='icon'], link[rel='shortcut icon']")
+  existingFavicons.forEach(el => el.remove())
+
+  // Create a fresh one with cache-bust timestamp
+  const link = document.createElement('link')
+  link.rel = 'icon'
+  link.type = 'image/png'
+  link.href = `${url}?v=${Date.now()}`
+  document.head.appendChild(link)
+}
+
+// For business dashboard — reads from auth token
 export function useBusinessMeta() {
   useEffect(() => {
     const applyMeta = async () => {
@@ -8,22 +22,12 @@ export function useBusinessMeta() {
         const response = await authAPI.getMe()
         const business = response.data.business
 
-        // Set page title
         if (business?.businessName) {
           document.title = business.businessName
         }
 
-        // Set favicon
         if (business?.logo) {
-          const favicon = document.querySelector<HTMLLinkElement>("link[rel='icon']")
-          if (favicon) {
-            favicon.href = business.logo
-          } else {
-            const newFavicon = document.createElement('link')
-            newFavicon.rel = 'icon'
-            newFavicon.href = business.logo
-            document.head.appendChild(newFavicon)
-          }
+          setFavicon(business.logo)
         }
       } catch (err) {
         // Not logged in or token expired — silently ignore
@@ -32,4 +36,30 @@ export function useBusinessMeta() {
 
     applyMeta()
   }, [])
+}
+
+// For client-facing pages — reads by slug from public API
+export function useClientBusinessMeta(businessSlug) {
+  useEffect(() => {
+    if (!businessSlug) return
+
+    const applyMeta = async () => {
+      try {
+        const response = await businessAPI.getBySlug(businessSlug)
+        const business = response.data.business
+
+        if (business?.businessName) {
+          document.title = business.businessName
+        }
+
+        if (business?.logo) {
+          setFavicon(business.logo)
+        }
+      } catch (err) {
+        // Business not found — silently ignore
+      }
+    }
+
+    applyMeta()
+  }, [businessSlug])
 }

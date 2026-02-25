@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useParams } from "react-router-dom"
 import { useState } from "react"
 import GalleryGrid from "./components/client/GalleryGrid"
 import ServicesPage from "./pages/client/ServicesPage"
@@ -17,7 +17,6 @@ import AuthCallback from './components/shared/AuthCallback';
 import ResetPasswordPage from "./pages/business/ResetPasswordPage"
 import ForgotPasswordPage from './pages/business/ForgotPasswordPage';
 
-// Shared layout components
 import ClientSidebar from "./components/client/ClientSidebar"
 import Footer from "./components/client/Footer"
 import TopTabs from "./components/client/TopTabs"
@@ -27,32 +26,35 @@ import BusinessLayout from "./components/layout/BusinessLayout"
 import BusinessSidebar from "./components/business/BusinessSidebar"
 import BusinessTopTabs from "./components/business/BusinessTopTabs"
 
-import { useBusinessMeta } from "./hooks/useBusinessMeta"
+import { useBusinessMeta, useClientBusinessMeta } from "./hooks/useBusinessMeta"
 
-// Unified Client Layout (for gallery, services, reviews, booking)
+// Unified Client Layout
 function UnifiedClientLayout() {
   const location = useLocation()
   const { pathname } = location
-  
+  const { businessSlug } = useParams()
+
+  // ✅ Set tab title and favicon from public business data
+  useClientBusinessMeta(businessSlug)
+
   const isBookingFlow = pathname.includes('/booking')
   const isConfirmationFlow = pathname.includes('/confirmation')
-  
-  const businessSlug = pathname.split('/')[1] || ""
-  const clientEmail = localStorage.getItem(`chat_${businessSlug}_email`) 
-    || localStorage.getItem(`booking_${businessSlug}_email`) 
+
+  const clientEmail = localStorage.getItem(`chat_${businessSlug}_email`)
+    || localStorage.getItem(`booking_${businessSlug}_email`)
     || ""
-  
+
   return (
     <div className='flex flex-col min-h-screen'>
       <div className='lg:hidden'>
         <ClientSidebar />
       </div>
-      
+
       <div className='flex flex-1'>
         <aside className='hidden lg:block w-80 p-6 overflow-y-auto'>
           <ClientSidebar />
         </aside>
-        
+
         <main className='flex-1 p-4 lg:p-6 overflow-y-auto'>
           {!isBookingFlow && !isConfirmationFlow && (
             <div className="transition-all duration-300 ease-in-out">
@@ -64,20 +66,20 @@ function UnifiedClientLayout() {
           </div>
         </main>
       </div>
-      
+
       <footer className='bg-footerBackground mt-auto'>
         <Footer />
       </footer>
 
       {!isConfirmationFlow && (
-        <AppointmentWidget 
-          businessSlug={businessSlug}
+        <AppointmentWidget
+          businessSlug={businessSlug || ""}
           clientEmail={clientEmail}
         />
       )}
 
-      <ChatWidget 
-        businessSlug={businessSlug} 
+      <ChatWidget
+        businessSlug={businessSlug || ""}
         apiBaseUrl={process.env.REACT_APP_API_URL || "http://localhost:5000/api"}
       />
     </div>
@@ -86,7 +88,7 @@ function UnifiedClientLayout() {
 
 // Business pages wrapper
 function BusinessPageLayout() {
-  // ✅ Set tab title and favicon to business name and logo
+  // ✅ Set tab title and favicon from authenticated business data
   useBusinessMeta()
 
   const location = useLocation()
@@ -94,7 +96,7 @@ function BusinessPageLayout() {
   const isCalendarPage = pathname.includes('/calendar')
 
   return (
-    <BusinessLayout 
+    <BusinessLayout
       showBusinessHeader={true}
       sidebar={<BusinessSidebar />}
       footer={<Footer />}
@@ -116,7 +118,7 @@ export default function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/business/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/business/reset-password" element={<ResetPasswordPage />} />
-        
+
         {/* Business Dashboard Routes */}
         <Route path="/business" element={<BusinessPageLayout />}>
           <Route index element={<Navigate to="gallery" replace />} />
