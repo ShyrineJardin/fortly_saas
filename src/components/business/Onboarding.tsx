@@ -109,24 +109,29 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-
+    
     // Validation
+    if (!businessName.trim()) {
+      setError('Business name is required')
+      return
+    }
+  
     if (!formData.ownerName.trim()) {
       setError('Owner name is required')
       return
     }
-
+  
     if (!formData.category) {
       setError('Please select a business category')
       return
     }
-
-
+  
     setLoading(true)
-
+  
     try {
       // Create FormData for file upload
       const data = new FormData()
+      data.append('businessName', businessName)  // ← Add this line
       data.append('ownerName', formData.ownerName)
       data.append('category', formData.category)
       data.append('phone', formData.phone)
@@ -137,7 +142,7 @@ export default function Onboarding() {
       if (formData.logo) {
         data.append('logo', formData.logo)
       }
-
+    
       const response = await businessAPI.completeOnboarding(data)
       
       console.log('Onboarding completed:', response.data)
@@ -208,18 +213,25 @@ export default function Onboarding() {
 
           {/* Row 1: Business Name (Read-only) & Owner's Full Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Business Name - READ ONLY */}
+            {/* Business Name - EDITABLE for Google users */}
             <div>
               <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2">
-                Business Name
+                Business Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 id="businessName"
+                name="businessName"
                 value={businessName}
-                readOnly
-                className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="Enter your business name"
+                className="text-sm w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                disabled={loading}
+                required
               />
+              <p className="mt-1 text-xs text-gray-500">
+                This will be used in your website URL: fortly.io/your-business-name
+              </p>
             </div>
 
             {/* Full Name Input */}

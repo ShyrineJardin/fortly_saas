@@ -78,20 +78,21 @@ router.get('/google/callback', async (req, res) => {
         `${process.env.FRONTEND_URL}/auth/callback?token=${token}&slug=${business.slug}&onboarding=${business.onboardingCompleted}`
       );
     } else {
-      // New user - create account
-      const businessName = name || email.split('@')[0];
-      const slug = await generateUniqueSlug(businessName);
-      
+      // New user - create account with temporary business name
+      const tempBusinessName = `temp-${email.split('@')[0]}-${Date.now()}`;
+      const slug = await generateUniqueSlug(tempBusinessName);
+        
       // Create business with random password (they won't use it since they're using Google)
       const randomPassword = Math.random().toString(36).slice(-12);
-      
+        
       business = await db.Business.create({
-        businessName,
+        businessName: tempBusinessName,  // ← Temporary placeholder
         email,
         password: randomPassword,
         slug,
         ownerName: name,
-        logo: picture
+        logo: picture,
+        onboardingCompleted: false  // ← Ensure they go through onboarding
       });
       
       const token = jwt.sign(

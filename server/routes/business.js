@@ -42,6 +42,7 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([
 ]), async (req, res) => {
   try {
     const { 
+      businessName,
       ownerName, 
       category, 
       phone, 
@@ -69,6 +70,51 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([
       linkedin,
       onboardingCompleted: true
     };
+
+    // If businessName is provided and different from temp name
+    if (businessName && businessName !== business.businessName) {
+      // Check if new business name is already taken
+      const existingBusiness = await db.Business.findOne({
+        where: { 
+          businessName,
+          id: { [db.Sequelize.Op.ne]: business.id }
+        }
+      });
+
+      if (existingBusiness) {
+        return res.status(400).json({ message: 'Business name already taken' });
+      }
+
+      // Generate new slug
+      const baseSlug = businessName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      let slug = baseSlug;
+      let counter = 1;
+      
+      let slugExists = await db.Business.findOne({ 
+        where: { 
+          slug,
+          id: { [db.Sequelize.Op.ne]: business.id }
+        }
+      });
+      
+      while (slugExists) {
+        slug = `${baseSlug}-${counter}`;
+        slugExists = await db.Business.findOne({ 
+          where: { 
+            slug,
+            id: { [db.Sequelize.Op.ne]: business.id }
+          }
+        });
+        counter++;
+      }
+
+      updateData.businessName = businessName;
+      updateData.slug = slug;
+    }
 
     if (req.files?.logo) {
       updateData.logo = req.files.logo[0].path; // Cloudinary URL
