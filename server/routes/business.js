@@ -4,37 +4,24 @@ const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const { uploadLogo } = require('../config/cloudinary');
 
-// Get business by slug (public route for clients)
-router.get('/:slug', async (req, res) => {
-  try {
-    const { slug } = req.params;
-    
-    const business = await db.Business.findOne({
-      where: { slug },
-      attributes: { exclude: ['password'] },
-      include: [
-        { model: db.Service, as: 'services', where: { isActive: true }, required: false },
-        { model: db.Gallery, as: 'gallery' },
-        { model: db.Schedule, as: 'schedules' },
-        { 
-          model: db.Review, 
-          as: 'reviews', 
-          where: { isApproved: true }, 
-          required: false 
-        }
-      ]
-    });
+// Helper: generate a unique slug for updates
+async function generateUniqueSlug(businessName, excludeId) {
+  const base = businessName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
-    if (!business) {
-      return res.status(404).json({ message: 'Business not found' });
-    }
+  let slug = base;
+  let counter = 1;
 
-    res.json({ business });
-  } catch (error) {
-    console.error('Get business error:', error);
-    res.status(500).json({ message: 'Server error' });
+  while (await db.Business.findOne({ 
+    where: { slug, id: { [db.Sequelize.Op.ne]: excludeId } } 
+  })) {
+    slug = `${base}-${counter++}`;
   }
-});
+
+  return slug;
+}
 
 // Complete onboarding
 router.put('/onboarding', authMiddleware, uploadLogo.fields([
@@ -77,66 +64,33 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([
       onboardingCompleted: true
     };
 
-    if (businessName && businessName.trim()) {
-      // Only update if it's different from current name
-      if (businessName !== business.businessName) {
-        // Check if new business name is already taken by another business
-        const existingBusiness = await db.Business.findOne({
-          where: { 
-            businessName,
-            id: { [db.Sequelize.Op.ne]: business.id }
-          }
-        });
-
-        if (existingBusiness) {
-          return res.status(400).json({ message: 'Business name already taken' });
+    // Only update businessName/slug if it changed
+    if (businessName && businessName.trim() && businessName !== business.businessName) {
+      // Check if name is already taken by another business
+      const existingBusiness = await db.Business.findOne({
+        where: { 
+          businessName,
+          id: { [db.Sequelize.Op.ne]: business.id }
         }
+      });
 
-        // Generate new slug from business name
-        const baseSlug = businessName
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        
-        let slug = baseSlug;
-        let counter = 1;
-        
-        // Check if slug exists
-        let slugExists = await db.Business.findOne({ 
-          where: { 
-            slug,
-            id: { [db.Sequelize.Op.ne]: business.id }
-          }
-        });
-        
-        // Make slug unique if needed
-        while (slugExists) {
-          slug = `${baseSlug}-${counter}`;
-          slugExists = await db.Business.findOne({ 
-            where: { 
-              slug,
-              id: { [db.Sequelize.Op.ne]: business.id }
-            }
-          });
-          counter++;
-        }
-
-        updateData.businessName = businessName;
-        updateData.slug = slug;
+      if (existingBusiness) {
+        return res.status(400).json({ message: 'Business name already taken' });
       }
+
+      updateData.businessName = businessName;
+      updateData.slug = await generateUniqueSlug(businessName, business.id); // ✅ using the helper
     }
 
     // Handle logo upload
     if (req.files?.logo) {
-      updateData.logo = req.files.logo[0].path; // Cloudinary URL
+      updateData.logo = req.files.logo[0].path;
     }
 
-    // Update the business
     await db.Business.update(updateData, {
       where: { id: req.business.id }
     });
 
-    // Fetch updated business data
     const updatedBusiness = await db.Business.findByPk(req.business.id, {
       attributes: { exclude: ['password'] }
     });
@@ -184,12 +138,11 @@ router.put('/profile', authMiddleware, uploadLogo.fields([
       twitter,
       instagram,
       linkedin,
-      // Handle optional buffer time - set to null if empty string
       bufferTime: bufferTime !== undefined ? (bufferTime || null) : undefined
     };
 
     if (req.files?.logo) {
-      updateData.logo = req.files.logo[0].path; // Cloudinary URL
+      updateData.logo = req.files.logo[0].path;
     }
 
     await db.Business.update(updateData, {
@@ -201,12 +154,10 @@ router.put('/profile', authMiddleware, uploadLogo.fields([
         ? JSON.parse(businessHours) 
         : businessHours;
 
-      // Delete existing schedules
       await db.Schedule.destroy({
         where: { businessId: req.business.id }
       });
 
-      // Create new schedules with rest time support
       const schedulePromises = hours
         .filter(hour => hour.enabled && hour.startTime && hour.endTime)
         .map(hour => 
@@ -264,6 +215,33 @@ router.put('/booking-policy', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Update booking policy error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get business by slug
+router.get('/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    
+    const business = await db.Business.findOne({
+      where: { slug },
+      attributes: { exclude: ['password'] },
+      include: [
+        { model: db.Service, as: 'services', where: { isActive: true }, required: false },
+        { model: db.Gallery, as: 'gallery' },
+        { model: db.Schedule, as: 'schedules' },
+        { model: db.Review, as: 'reviews', where: { isApproved: true }, required: false }
+      ]
+    });
+
+    if (!business) {
+      return res.status(404).json({ message: 'Business not found' });
+    }
+
+    res.json({ business });
+  } catch (error) {
+    console.error('Get business error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

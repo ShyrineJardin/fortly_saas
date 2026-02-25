@@ -21,7 +21,6 @@ export default function Onboarding() {
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [isCategoryOpen, setIsCategoryOpen] = useState(false)
-  const [isTimezoneOpen, setIsTimezoneOpen] = useState(false)
 
   const businessCategories = [
     'Salon / Spa',
@@ -37,18 +36,26 @@ export default function Onboarding() {
     'Other'
   ]
 
+  // Fix 1: Define generateSlugPreview inside the component
+  const generateSlugPreview = (name: string) => {
+    if (!name) return ''
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  }
 
-  // Fetch current user data on mount
+  // Fix 2: Use businessName state, not formData.businessName (which doesn't exist)
+  const slugPreview = generateSlugPreview(businessName)
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const response = await authAPI.getMe()
         const business = response.data.business
         
-        // Set business name (read-only)
         setBusinessName(business.businessName)
         
-        // Pre-fill form if data exists
         setFormData(prev => ({
           ...prev,
           ownerName: business.ownerName || '',
@@ -59,7 +66,6 @@ export default function Onboarding() {
           description: business.description || '',
         }))
         
-        // Set logo preview if exists
         if (business.logo) {
           setLogoPreview(business.logo)
         }
@@ -79,29 +85,22 @@ export default function Onboarding() {
     })
   }
 
-  const slugPreview = generateSlugPreview(formData.businessName)
-
   const handleSelectCategory = (category: string) => {
     setFormData({ ...formData, category })
     setIsCategoryOpen(false)
   }
 
-
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate file size (5MB max)
       if (file.size > 5 * 1024 * 1024) {
         setError('Logo file size must be less than 5MB')
         return
       }
-
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         setError('Please upload an image file')
         return
       }
-
       setFormData({ ...formData, logo: file })
       setLogoPreview(URL.createObjectURL(file))
       setError('')
@@ -112,17 +111,14 @@ export default function Onboarding() {
     e.preventDefault()
     setError('')
 
-    // Validation
     if (!businessName.trim()) {
       setError('Business name is required')
       return
     }
-
     if (!formData.ownerName.trim()) {
       setError('Owner name is required')
       return
     }
-
     if (!formData.category) {
       setError('Please select a business category')
       return
@@ -131,9 +127,8 @@ export default function Onboarding() {
     setLoading(true)
 
     try {
-      // Create FormData for file upload
       const data = new FormData()
-      data.append('businessName', businessName)  // ← Add this line
+      data.append('businessName', businessName)
       data.append('ownerName', formData.ownerName)
       data.append('category', formData.category)
       data.append('phone', formData.phone)
@@ -146,10 +141,7 @@ export default function Onboarding() {
       }
 
       const response = await businessAPI.completeOnboarding(data)
-
       console.log('Onboarding completed:', response.data)
-
-      // Navigate to gallery or next step
       navigate('/business/gallery')
     } catch (err: any) {
       console.error('Onboarding error:', err)
@@ -213,9 +205,8 @@ export default function Onboarding() {
             </div>
           </div>
 
-          {/* Row 1: Business Name (Read-only) & Owner's Full Name */}
+          {/* Row 1: Business Name & Owner's Full Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Business Name - EDITABLE for Google users */}
             <div>
               <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2">
                 Business Name <span className="text-red-500">*</span>
@@ -231,7 +222,7 @@ export default function Onboarding() {
                 disabled={loading}
                 required
               />
-              {/* Slug Preview */}
+              {/* Fix 2: slugPreview now correctly reads from businessName state */}
               {slugPreview && (
                 <p className="mt-1 text-xs text-gray-500">
                   Your page will be: <span className="font-medium text-emerald-600">
@@ -241,7 +232,6 @@ export default function Onboarding() {
               )}
             </div>
 
-            {/* Full Name Input */}
             <div>
               <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700 mb-2">
                 Owner's Full Name <span className="text-red-500">*</span>
@@ -260,9 +250,8 @@ export default function Onboarding() {
             </div>
           </div>
 
-          {/* Row 2: Business Category & Timezone */}
+          {/* Row 2: Business Category */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Business Category Dropdown */}
             <div>
               <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
                 What type of business are you? <span className="text-red-500">*</span>
@@ -296,7 +285,6 @@ export default function Onboarding() {
                 )}
               </div>
             </div>
-
           </div>
 
           {/* Optional Details Divider */}
@@ -306,7 +294,6 @@ export default function Onboarding() {
 
           {/* Row 3: Phone Number & Location */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Phone Number */}
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                 Phone number
@@ -323,7 +310,6 @@ export default function Onboarding() {
               />
             </div>
 
-            {/* Location */}
             <div>
               <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
                 Location
@@ -343,7 +329,6 @@ export default function Onboarding() {
 
           {/* Row 4: Tagline & Short Description */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Tagline */}
             <div>
               <label htmlFor="tagline" className="block text-sm font-medium text-gray-700 mb-2">
                 Tagline
@@ -360,7 +345,6 @@ export default function Onboarding() {
               />
             </div>
 
-            {/* Short Description */}
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
                 Short description
