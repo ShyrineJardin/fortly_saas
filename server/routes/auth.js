@@ -232,6 +232,33 @@ router.delete('/account', authMiddleware, async (req, res) => {
   try {
     const businessId = req.business.id;
 
+    // ✅ CHECK FOR PENDING/CONFIRMED APPOINTMENTS
+    const pendingBookings = await db.Booking.findAll({
+      where: { 
+        businessId,
+        status: ['pending', 'confirmed']
+      },
+      include: [
+        { model: db.Service, as: 'Service' }
+      ],
+      order: [['bookingDate', 'ASC'], ['bookingTime', 'ASC']]
+    });
+
+    if (pendingBookings.length > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete account with pending appointments',
+        pendingBookings: pendingBookings.map(booking => ({
+          id: booking.id,
+          clientName: booking.clientName,
+          clientEmail: booking.clientEmail,
+          serviceName: booking.Service?.name,
+          bookingDate: booking.bookingDate,
+          bookingTime: booking.bookingTime,
+          status: booking.status
+        }))
+      });
+    }
+
     // Delete all related data (cascading delete)
     await db.Schedule.destroy({ where: { businessId } });
     await db.Service.destroy({ where: { businessId } });
