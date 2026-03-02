@@ -593,7 +593,7 @@ export default function BusinessHeader() {
                     setShowPendingBookingsModal(false);
                     navigate('/business/calendar');
                   }}
-                  className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                  className="flex-1 bg-hoverGreen text-white px-6 py-3 rounded-lg font-semibold"
                 >
                   Go to Calendar
                 </button>

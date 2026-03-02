@@ -21,90 +21,58 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
-      validate: {
-        isEmail: true
-      }
+      validate: { isEmail: true }
     },
     password: {
       type: DataTypes.STRING,
       allowNull: false
     },
-    ownerName: {
-      type: DataTypes.STRING
-    },
-    phone: {
-      type: DataTypes.STRING
-    },
-    location: {
-      type: DataTypes.TEXT
-    },
-    category: {
-      type: DataTypes.STRING
-    },
-    tagline: {
-      type: DataTypes.TEXT
-    },
-    description: {
-      type: DataTypes.TEXT
-    },
+    ownerName: { type: DataTypes.STRING },
+    phone: { type: DataTypes.STRING },
+    location: { type: DataTypes.TEXT },
+    category: { type: DataTypes.STRING },
+    tagline: { type: DataTypes.TEXT },
+    description: { type: DataTypes.TEXT },
     timezone: {
       type: DataTypes.STRING,
       defaultValue: 'Asia/Manila'
     },
-    logo: {
-      type: DataTypes.STRING
-    },
-    coverImage: {
-      type: DataTypes.STRING
-    },
-    facebook: {
-      type: DataTypes.STRING
-    },
-    twitter: {
-      type: DataTypes.STRING
-    },
-    instagram: {
-      type: DataTypes.STRING
-    },
-    linkedin: {
-      type: DataTypes.STRING
-    },
+    logo: { type: DataTypes.STRING },
+    coverImage: { type: DataTypes.STRING },
+    facebook: { type: DataTypes.STRING },
+    twitter: { type: DataTypes.STRING },
+    instagram: { type: DataTypes.STRING },
+    linkedin: { type: DataTypes.STRING },
+
     // Booking Policy
     bookingPolicyTitle: {
       type: DataTypes.STRING,
       defaultValue: 'Booking Policy'
     },
-    bookingPolicyDescription: {
-      type: DataTypes.TEXT
-    },
+    bookingPolicyDescription: { type: DataTypes.TEXT },
     bookingPolicyList: {
-      type: DataTypes.JSON, 
+      type: DataTypes.JSON,
       defaultValue: []
     },
+
+    // Scheduling settings
     bufferTime: {
-      type: DataTypes.STRING, 
-      allowNull: true,
-      defaultValue: null
-    },
-    // Google Calendar Integration
-    googleCalendarTokens: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-      comment: 'Stored as JSON string with access_token and refresh_token'
-    },
-    googleCalendarConnected: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    // Password Reset Fields
-    resetPasswordToken: {
       type: DataTypes.STRING,
-      allowNull: true
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Cooldown/prep time added after each appointment slot. e.g. "15 minutes"'
     },
-    resetPasswordExpires: {
-      type: DataTypes.DATE,
-      allowNull: true
+    maxConcurrentBookings: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      comment: '1 = sequential (one at a time). 2+ = concurrent (e.g. salon with multiple staff)'
     },
+
+    // Password Reset
+    resetPasswordToken: { type: DataTypes.STRING, allowNull: true },
+    resetPasswordExpires: { type: DataTypes.DATE, allowNull: true },
+
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
@@ -121,7 +89,6 @@ module.exports = (sequelize, DataTypes) => {
           const salt = await bcrypt.genSalt(10);
           business.password = await bcrypt.hash(business.password, salt);
         }
-        // Generate slug from business name
         if (business.businessName && !business.slug) {
           business.slug = business.businessName
             .toLowerCase()

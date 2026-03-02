@@ -72,14 +72,16 @@ router.get('/my-services', authMiddleware, async (req, res) => {
 // Create service
 router.post('/', authMiddleware, uploadLogo.single('image'), async (req, res) => {
   try {
-    const { name, description, price, duration } = req.body;
+    // ✅ Added serviceType
+    const { name, description, price, duration, serviceType } = req.body;
 
     const serviceData = {
       businessId: req.business.id,
       name,
       description,
       price,
-      duration
+      duration,
+      serviceType: serviceType || 'appointment' // ✅ save it
     };
 
     if (req.file) {
@@ -97,7 +99,8 @@ router.post('/', authMiddleware, uploadLogo.single('image'), async (req, res) =>
 // Update service
 router.put('/:id', authMiddleware, uploadLogo.single('image'), async (req, res) => {
   try {
-    const { name, description, price, duration, isActive } = req.body;
+    // ✅ Added serviceType
+    const { name, description, price, duration, isActive, serviceType } = req.body;
 
     const service = await db.Service.findOne({
       where: { id: req.params.id, businessId: req.business.id }
@@ -112,6 +115,7 @@ router.put('/:id', authMiddleware, uploadLogo.single('image'), async (req, res) 
       description,
       price,
       duration,
+      serviceType: serviceType || service.serviceType, // ✅ save it, fallback to existing
       isActive: isActive !== undefined ? isActive : service.isActive
     };
 

@@ -8,18 +8,12 @@ module.exports = (sequelize, DataTypes) => {
     businessId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: {
-        model: 'Businesses',
-        key: 'id'
-      }
+      references: { model: 'Businesses', key: 'id' }
     },
     serviceId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: {
-        model: 'Services',
-        key: 'id'
-      }
+      references: { model: 'Services', key: 'id' }
     },
     clientName: {
       type: DataTypes.STRING,
@@ -28,9 +22,7 @@ module.exports = (sequelize, DataTypes) => {
     clientEmail: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        isEmail: true
-      }
+      validate: { isEmail: true }
     },
     clientPhone: {
       type: DataTypes.STRING
@@ -40,11 +32,22 @@ module.exports = (sequelize, DataTypes) => {
     },
     bookingDate: {
       type: DataTypes.DATEONLY,
-      allowNull: false
+      allowNull: false,
+      comment: 'Start date of the booking (or pickup/delivery date for preparation services)'
     },
     bookingTime: {
-      type: DataTypes.TIME,
+      type: DataTypes.STRING, // stored as "HH:mm"
       allowNull: false
+    },
+    bookingEndDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      comment: 'End date for multi-day occupancy bookings. Null for same-day appointments.'
+    },
+    bookingEndTime: {
+      type: DataTypes.STRING, // stored as "HH:mm"
+      allowNull: true,
+      comment: 'Calculated end time of the service slot'
     },
     status: {
       type: DataTypes.ENUM('pending', 'confirmed', 'completed', 'cancelled'),
@@ -52,17 +55,6 @@ module.exports = (sequelize, DataTypes) => {
     },
     notes: {
       type: DataTypes.TEXT
-    },
-    // Google Calendar Integration
-    googleCalendarEventId: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      comment: 'Event ID in business calendar'
-    },
-    clientCalendarEventId: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      comment: 'Event ID in client calendar (if client authorized)'
     },
     // Chat Integration
     hasChatHistory: {
@@ -98,11 +90,9 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     timestamps: true,
     hooks: {
-      beforeUpdate: async (booking, options) => {
-        // Track cancellation details
+      beforeUpdate: async (booking) => {
         if (booking.changed('status') && booking.status === 'cancelled') {
           booking.cancelledAt = new Date();
-          // You can add logic to determine who cancelled based on context
         }
       }
     }

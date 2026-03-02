@@ -5,60 +5,84 @@ const authMiddleware = require('../middleware/auth');
 const availabilityService = require('../services/availabilityService');
 const emailService = require('../services/emailService')();
 
-// ==================== CREATE BOOKING ====================
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch existing bookings for a date range (handles multi-day occupancy bookings).
+ * For a given date we need bookings that:
+ *   - start on that date, OR
+ *   - are occupancy bookings whose span INCLUDES that date
+ */
+async function getRelevantBookings(businessId, date) {
+  const { Op } = db.Sequelize;
+  return db.Booking.findAll({
+    where: {
+      businessId,
+      status: ['pending', 'confirmed'],
+      [Op.or]: [
+        { bookingDate: date },
+        // Occupancy bookings that started before and end after this date
+        {
+          bookingDate: { [Op.lte]: date },
+          bookingEndDate: { [Op.gte]: date }
+        }
+      ]
+    },
+    include: [{ model: db.Service, as: 'Service' }]
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CREATE BOOKING
+// ─────────────────────────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    const { 
-      businessSlug, 
-      serviceId, 
-      clientName, 
-      clientEmail, 
+    const {
+      businessSlug,
+      serviceId,
+      clientName,
+      clientEmail,
       clientPhone,
-      bookingDate, 
-      bookingTime, 
+      bookingDate,
+      bookingTime,
       notes,
       clientAddress
     } = req.body;
 
-    console.log('📝 Creating booking:', { businessSlug, serviceId, clientEmail, bookingDate, bookingTime });
-
-    const business = await db.Business.findOne({ 
+    const business = await db.Business.findOne({
       where: { slug: businessSlug },
       include: [{ model: db.Schedule, as: 'schedules' }]
     });
-    
-    if (!business) {
-      return res.status(404).json({ message: 'Business not found' });
-    }
+    if (!business) return res.status(404).json({ message: 'Business not found' });
 
     const service = await db.Service.findOne({
       where: { id: serviceId, businessId: business.id }
     });
+    if (!service) return res.status(404).json({ message: 'Service not found' });
 
-    if (!service) {
-      return res.status(404).json({ message: 'Service not found' });
-    }
-
-    const existingBookings = await db.Booking.findAll({
-      where: { 
-        businessId: business.id,
-        bookingDate,
-        status: ['pending', 'confirmed']
-      },
-      include: [{ model: db.Service, as: 'Service' }]
-    });
+    // Get all bookings relevant to this date (including multi-day spans)
+    const existingBookings = await getRelevantBookings(business.id, bookingDate);
 
     const slotsData = await availabilityService.getAvailableSlotsWithStatus(
       business, service, bookingDate, existingBookings
     );
 
     const isAvailable = slotsData.availableSlots.some(slot => slot.time === bookingTime);
-
     if (!isAvailable) {
-      return res.status(400).json({ 
-        message: 'This time slot is no longer available. Please select another time.' 
+      return res.status(400).json({
+        message: 'This time slot is no longer available. Please select another time.'
       });
     }
+
+    // Calculate end date/time for multi-day services
+    const { endDate, endTime } = availabilityService.calculateEndDate(
+      bookingDate,
+      bookingTime,
+      service.duration,
+      business.timezone
+    );
 
     const booking = await db.Booking.create({
       businessId: business.id,
@@ -69,12 +93,13 @@ router.post('/', async (req, res) => {
       clientAddress,
       bookingDate,
       bookingTime,
+      bookingEndDate: endDate !== bookingDate ? endDate : null,
+      bookingEndTime: endTime,
       notes,
       status: 'pending'
     });
 
-    console.log('✅ Booking created:', booking.id);
-
+    // Attach chat history flag
     const chatMessages = await db.Message.findAll({
       where: { businessId: business.id, clientEmail },
       order: [['createdAt', 'ASC']],
@@ -92,15 +117,13 @@ router.post('/', async (req, res) => {
       include: [{ model: db.Service, as: 'Service' }]
     });
 
-    // Send response immediately - don't wait for email
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'Booking created successfully',
       booking: bookingWithService,
       hasChatHistory: chatMessages.length > 0,
       chatMessageCount: chatMessages.length
     });
 
-    // Send emails after response (truly non-blocking)
     emailService.sendBookingConfirmation(booking, business, service)
       .then(() => console.log('✅ Confirmation emails sent'))
       .catch(err => console.error('❌ Email failed:', err.message));
@@ -111,7 +134,97 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ==================== UPDATE BOOKING STATUS ====================
+// ─────────────────────────────────────────────────────────────────────────────
+// GET AVAILABLE SLOTS
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/available-slots/:businessSlug/:date', async (req, res) => {
+  try {
+    const { businessSlug, date } = req.params;
+    const { serviceId } = req.query;
+
+    const business = await db.Business.findOne({
+      where: { slug: businessSlug },
+      include: [{ model: db.Schedule, as: 'schedules' }]
+    });
+    if (!business) return res.status(404).json({ message: 'Business not found' });
+
+    const service = await db.Service.findOne({
+      where: { id: serviceId, businessId: business.id }
+    });
+    if (!service) return res.status(404).json({ message: 'Service not found' });
+
+    // Use extended query that includes multi-day spans
+    const existingBookings = await getRelevantBookings(business.id, date);
+
+    const slotsData = await availabilityService.getAvailableSlotsWithStatus(
+      business, service, date, existingBookings
+    );
+
+    const minAdvanceDays = availabilityService.getMinAdvanceDays(
+      business.bufferTime,
+      service.duration,
+      service.serviceType || 'appointment'
+    );
+
+    res.json({
+      availableSlots: slotsData.availableSlots,
+      takenSlots: slotsData.takenSlots,
+      closedDay: slotsData.closedDay,
+      blockedByOccupancy: slotsData.blockedByOccupancy,
+      minAdvanceDays,
+      timezone: business.timezone,
+      bufferTime: business.bufferTime,
+      serviceDuration: service.duration,
+      serviceType: service.serviceType || 'appointment',
+      maxConcurrentBookings: business.maxConcurrentBookings || 1
+    });
+
+  } catch (error) {
+    console.error('❌ Get available slots error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CHECK AVAILABILITY
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/check-availability', async (req, res) => {
+  try {
+    const { businessSlug, serviceId, bookingDate, bookingTime } = req.body;
+
+    const business = await db.Business.findOne({
+      where: { slug: businessSlug },
+      include: [{ model: db.Schedule, as: 'schedules' }]
+    });
+    if (!business) return res.status(404).json({ message: 'Business not found' });
+
+    const service = await db.Service.findOne({
+      where: { id: serviceId, businessId: business.id }
+    });
+    if (!service) return res.status(404).json({ message: 'Service not found' });
+
+    const existingBookings = await getRelevantBookings(business.id, bookingDate);
+
+    const slotsData = await availabilityService.getAvailableSlotsWithStatus(
+      business, service, bookingDate, existingBookings
+    );
+
+    const isAvailable = slotsData.availableSlots.some(slot => slot.time === bookingTime);
+
+    res.json({
+      available: isAvailable,
+      message: isAvailable ? 'Time slot is available' : 'Time slot is not available'
+    });
+
+  } catch (error) {
+    console.error('❌ Check availability error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE BOOKING STATUS
+// ─────────────────────────────────────────────────────────────────────────────
 router.put('/:id/status', authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
@@ -124,26 +237,19 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
       where: { id: req.params.id, businessId: req.business.id },
       include: [{ model: db.Service, as: 'Service' }]
     });
-
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
     const oldStatus = booking.status;
     await booking.update({ status });
 
-    console.log('📝 Booking status updated:', { id: booking.id, oldStatus, newStatus: status });
-
     res.json({ message: 'Booking status updated successfully', booking });
 
-    // Send status update email after response (non-blocking)
     try {
       const business = await db.Business.findByPk(req.business.id);
       emailService.sendBookingStatusUpdate(booking, business, booking.Service, oldStatus, status)
-        .then(() => console.log('📧 Status update email sent'))
         .catch(err => console.error('⚠️ Email failed:', err.message));
-    } catch (emailError) {
-      console.error('⚠️ Email init failed:', emailError.message);
+    } catch (e) {
+      console.error('⚠️ Email init failed:', e.message);
     }
 
   } catch (error) {
@@ -152,7 +258,9 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
-// ==================== RESCHEDULE BOOKING ====================
+// ─────────────────────────────────────────────────────────────────────────────
+// RESCHEDULE BOOKING
+// ─────────────────────────────────────────────────────────────────────────────
 router.put('/:id/reschedule', async (req, res) => {
   try {
     const { bookingDate, bookingTime, clientEmail } = req.body;
@@ -164,36 +272,37 @@ router.put('/:id/reschedule', async (req, res) => {
         { model: db.Business, as: 'Business', include: [{ model: db.Schedule, as: 'schedules' }] }
       ]
     });
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
-
-    if (booking.status === 'cancelled' || booking.status === 'completed') {
+    if (['cancelled', 'completed'].includes(booking.status)) {
       return res.status(400).json({ message: 'Cannot reschedule cancelled or completed bookings' });
     }
 
-    const existingBookings = await db.Booking.findAll({
-      where: { 
-        businessId: booking.businessId,
-        bookingDate,
-        status: ['pending', 'confirmed'],
-        id: { [db.Sequelize.Op.ne]: booking.id }
-      },
-      include: [{ model: db.Service, as: 'Service' }]
-    });
+    const existingBookings = (await getRelevantBookings(booking.businessId, bookingDate))
+      .filter(b => b.id !== booking.id);
 
     const slotsData = await availabilityService.getAvailableSlotsWithStatus(
       booking.Business, booking.Service, bookingDate, existingBookings
     );
 
     const isAvailable = slotsData.availableSlots.some(slot => slot.time === bookingTime);
-
     if (!isAvailable) {
       return res.status(400).json({ message: 'This time slot is not available' });
     }
 
-    await booking.update({ bookingDate, bookingTime });
+    const { endDate, endTime } = availabilityService.calculateEndDate(
+      bookingDate,
+      bookingTime,
+      booking.Service.duration,
+      booking.Business.timezone
+    );
+
+    await booking.update({
+      bookingDate,
+      bookingTime,
+      bookingEndDate: endDate !== bookingDate ? endDate : null,
+      bookingEndTime: endTime
+    });
 
     res.json({ message: 'Booking rescheduled successfully', booking });
 
@@ -203,7 +312,9 @@ router.put('/:id/reschedule', async (req, res) => {
   }
 });
 
-// ==================== CANCEL BOOKING ====================
+// ─────────────────────────────────────────────────────────────────────────────
+// CANCEL BOOKING
+// ─────────────────────────────────────────────────────────────────────────────
 router.put('/:id/cancel', async (req, res) => {
   try {
     const { clientEmail, reason, cancelledBy } = req.body;
@@ -215,41 +326,21 @@ router.put('/:id/cancel', async (req, res) => {
         { model: db.Business, as: 'Business' }
       ]
     });
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    if (booking.status === 'cancelled') return res.status(400).json({ message: 'Booking is already cancelled' });
+    if (booking.status === 'completed') return res.status(400).json({ message: 'Cannot cancel completed bookings' });
 
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
-
-    if (booking.status === 'cancelled') {
-      return res.status(400).json({ message: 'Booking is already cancelled' });
-    }
-
-    if (booking.status === 'completed') {
-      return res.status(400).json({ message: 'Cannot cancel completed bookings' });
-    }
-
-    await booking.update({ 
+    await booking.update({
       status: 'cancelled',
       cancelledBy: cancelledBy || 'client',
       cancellationReason: reason,
       cancelledAt: new Date()
     });
 
-    console.log('✅ Booking cancelled:', booking.id);
+    res.json({ message: 'Booking cancelled successfully. Both parties have been notified.', booking });
 
-    res.json({ 
-      message: 'Booking cancelled successfully. Both parties have been notified.',
-      booking 
-    });
-
-    // Send cancellation emails after response (non-blocking)
-    try {
-      emailService.sendCancellationNotification(booking, booking.Business, booking.Service, reason, cancelledBy || 'client')
-        .then(() => console.log('✅ Cancellation emails sent'))
-        .catch(err => console.error('⚠️ Email failed:', err.message));
-    } catch (emailError) {
-      console.error('⚠️ Email init failed:', emailError.message);
-    }
+    emailService.sendCancellationNotification(booking, booking.Business, booking.Service, reason, cancelledBy || 'client')
+      .catch(err => console.error('⚠️ Email failed:', err.message));
 
   } catch (error) {
     console.error('❌ Cancel booking error:', error);
@@ -257,68 +348,19 @@ router.put('/:id/cancel', async (req, res) => {
   }
 });
 
-// ==================== GET AVAILABLE SLOTS ====================
-router.get('/available-slots/:businessSlug/:date', async (req, res) => {
-  try {
-    const { businessSlug, date } = req.params;
-    const { serviceId } = req.query;
-
-    const business = await db.Business.findOne({ 
-      where: { slug: businessSlug },
-      include: [{ model: db.Schedule, as: 'schedules' }]
-    });
-
-    if (!business) return res.status(404).json({ message: 'Business not found' });
-
-    const service = await db.Service.findOne({
-      where: { id: serviceId, businessId: business.id }
-    });
-
-    if (!service) return res.status(404).json({ message: 'Service not found' });
-
-    const existingBookings = await db.Booking.findAll({
-      where: { 
-        businessId: business.id,
-        bookingDate: date,
-        status: ['pending', 'confirmed']
-      },
-      include: [{ model: db.Service, as: 'Service' }]
-    });
-
-    const slotsData = await availabilityService.getAvailableSlotsWithStatus(
-      business, service, date, existingBookings
-    );
-
-    const minAdvanceDays = availabilityService.getMinAdvanceDays(
-      business.bufferTime, service.duration
-    );
-
-    res.json({ 
-      availableSlots: slotsData.availableSlots,
-      takenSlots: slotsData.takenSlots,
-      closedDay: slotsData.closedDay,
-      minAdvanceDays,
-      timezone: business.timezone,
-      bufferTime: business.bufferTime,
-      serviceDuration: service.duration
-    });
-
-  } catch (error) {
-    console.error('❌ Get available slots error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// ==================== GET BUSINESS BOOKINGS ====================
+// ─────────────────────────────────────────────────────────────────────────────
+// GET BUSINESS BOOKINGS
+// ─────────────────────────────────────────────────────────────────────────────
 router.get('/my-bookings', authMiddleware, async (req, res) => {
   try {
     const { status, date, startDate, endDate } = req.query;
+    const { Op } = db.Sequelize;
     const whereClause = { businessId: req.business.id };
-    
+
     if (status) whereClause.status = status;
     if (date) whereClause.bookingDate = date;
     if (startDate && endDate) {
-      whereClause.bookingDate = { [db.Sequelize.Op.between]: [startDate, endDate] };
+      whereClause.bookingDate = { [Op.between]: [startDate, endDate] };
     }
 
     const bookings = await db.Booking.findAll({
@@ -343,13 +385,15 @@ router.get('/my-bookings', authMiddleware, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET SINGLE BOOKING
+// ─────────────────────────────────────────────────────────────────────────────
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const booking = await db.Booking.findOne({
       where: { id: req.params.id, businessId: req.business.id },
       include: [{ model: db.Service, as: 'Service' }]
     });
-
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
     const chatMessages = await db.Message.findAll({
@@ -364,6 +408,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET CLIENT BOOKINGS
+// ─────────────────────────────────────────────────────────────────────────────
 router.get('/client/:clientEmail', async (req, res) => {
   try {
     const { clientEmail } = req.params;
@@ -387,45 +434,6 @@ router.get('/client/:clientEmail', async (req, res) => {
     res.json({ bookings });
   } catch (error) {
     console.error('❌ Get client bookings error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-router.post('/check-availability', async (req, res) => {
-  try {
-    const { businessSlug, serviceId, bookingDate, bookingTime } = req.body;
-
-    const business = await db.Business.findOne({ 
-      where: { slug: businessSlug },
-      include: [{ model: db.Schedule, as: 'schedules' }]
-    });
-
-    if (!business) return res.status(404).json({ message: 'Business not found' });
-
-    const service = await db.Service.findOne({
-      where: { id: serviceId, businessId: business.id }
-    });
-
-    if (!service) return res.status(404).json({ message: 'Service not found' });
-
-    const existingBookings = await db.Booking.findAll({
-      where: { businessId: business.id, bookingDate, status: ['pending', 'confirmed'] },
-      include: [{ model: db.Service, as: 'Service' }]
-    });
-
-    const slotsData = await availabilityService.getAvailableSlotsWithStatus(
-      business, service, bookingDate, existingBookings
-    );
-
-    const isAvailable = slotsData.availableSlots.some(slot => slot.time === bookingTime);
-
-    res.json({ 
-      available: isAvailable,
-      message: isAvailable ? 'Time slot is available' : 'Time slot is not available'
-    });
-
-  } catch (error) {
-    console.error('❌ Check availability error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

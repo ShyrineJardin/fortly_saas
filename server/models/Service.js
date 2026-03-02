@@ -8,10 +8,7 @@ module.exports = (sequelize, DataTypes) => {
     businessId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: {
-        model: 'Businesses',
-        key: 'id'
-      }
+      references: { model: 'Businesses', key: 'id' }
     },
     name: {
       type: DataTypes.STRING,
@@ -21,11 +18,16 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT
     },
     price: {
-      type: DataTypes.STRING, // Store as string (e.g., "PHP 1,500")
+      type: DataTypes.STRING,
       allowNull: false
     },
     duration: {
-      type: DataTypes.STRING, // Store as string (e.g., "60 mins")
+      type: DataTypes.STRING, // e.g. "60 minutes", "3 days"
+      allowNull: false
+    },
+    serviceType: {
+      type: DataTypes.ENUM('appointment', 'preparation', 'occupancy'),
+      defaultValue: 'appointment',
       allowNull: false
     },
     image: {

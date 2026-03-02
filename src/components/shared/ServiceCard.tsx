@@ -11,23 +11,47 @@ interface ServiceProps {
   description: string;
   image?: string;
   showArrow?: boolean;
+  serviceType?: string; // 'appointment' | 'preparation' | 'occupancy'
 }
 
-export default function ServiceCard({ 
-  id, 
-  title, 
-  duration, 
-  price, 
-  description, 
+const SERVICE_TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
+  appointment: {
+    icon: '📅',
+    label: 'Appointment',
+    color: 'bg-blue-50 text-blue-700 border-blue-100'
+  },
+  preparation: {
+    icon: '🎂',
+    label: 'Preparation / Order',
+    color: 'bg-orange-50 text-orange-700 border-orange-100'
+  },
+  occupancy: {
+    icon: '🏗️',
+    label: 'Occupancy / Rental',
+    color: 'bg-purple-50 text-purple-700 border-purple-100'
+  }
+};
+
+export default function ServiceCard({
+  id,
+  title,
+  duration,
+  price,
+  description,
   image,
-  showArrow = false 
+  showArrow = false,
+  serviceType
 }: ServiceProps) {
+
+  // Don't assume appointment - only show badge if serviceType is explicitly set
   const [isOpen, setIsOpen] = useState(false);
-  const navigate = useNavigate(); 
-  const { businessSlug } = useParams<{ businessSlug: string }>(); // Get business slug
+  const navigate = useNavigate();
+  const { businessSlug } = useParams<{ businessSlug: string }>();
+
+  const typeConfig = serviceType ? (SERVICE_TYPE_CONFIG[serviceType] || null) : null;
 
   const handleBooking = () => {
-    const serviceData = { id, title, duration, price, description, image };
+    const serviceData = { id, title, duration, price, description, image, serviceType };
     navigate(`/${businessSlug}/booking`, { state: { selectedService: serviceData } });
   };
 
@@ -36,34 +60,42 @@ export default function ServiceCard({
       <div className="flex items-center justify-between">
         <div className="flex items-start gap-4">
           {image ? (
-            <img 
+            <img
               src={image}
               alt={title}
-              className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0 object-cover" 
+              className="lg:w-20 lg:h-20 w-16 h-16 bg-gray-200 rounded-lg flex-shrink-0 object-cover"
             />
           ) : (
-            <div className="lg:w-16 lg:h-16 w-14 h-14 bg-gray-200 rounded-lg flex-shrink-0" />
+            <div className="lg:w-16 lg:h-16 w-16 h-16 bg-gray-200 rounded-lg flex-shrink-0" />
           )}
-          
-          <div>
+
+          <div className="flex-1">
+            {/* Service Type Badge */}
+            {typeConfig && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border mb-1 ${typeConfig.color}`}>
+                {typeConfig.icon} {typeConfig.label}
+              </span>
+            )}
+
             <h3 className="lg:text-base text-sm font-semibold">{title}</h3>
-            <p className="lg:text-sm text-xs text-gray-500">{duration} . {price}</p>
-            <button 
+            <p className="lg:text-sm text-xs text-gray-500">{duration} · {price}</p>
+
+            <button
               onClick={() => setIsOpen(!isOpen)}
               className="lg:text-sm text-xs flex items-center gap-1 lg:mt-1 hover:underline text-gray-600"
             >
-              More Details 
-              {isOpen ? FaAngleUp ({size:14}) : FaAngleDown ({size:14}) }
+              More Details
+              {isOpen ? FaAngleUp({ size: 14 }) : FaAngleDown({ size: 14 })}
             </button>
           </div>
         </div>
 
         {showArrow && (
-          <button 
+          <button
             onClick={handleBooking}
             className="text-primaryGreen hover:scale-110 transition-transform"
           >
-            {CiCircleChevRight ({size: 40}) }
+            {CiCircleChevRight({ size: 40 })}
           </button>
         )}
       </div>

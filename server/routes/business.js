@@ -4,7 +4,6 @@ const db = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 const { uploadLogo } = require('../config/cloudinary');
 
-// Helper: generate a unique slug for updates
 async function generateUniqueSlug(businessName, excludeId) {
   const base = businessName
     .toLowerCase()
@@ -14,8 +13,8 @@ async function generateUniqueSlug(businessName, excludeId) {
   let slug = base;
   let counter = 1;
 
-  while (await db.Business.findOne({ 
-    where: { slug, id: { [db.Sequelize.Op.ne]: excludeId } } 
+  while (await db.Business.findOne({
+    where: { slug, id: { [db.Sequelize.Op.ne]: excludeId } }
   })) {
     slug = `${base}-${counter++}`;
   }
@@ -23,153 +22,97 @@ async function generateUniqueSlug(businessName, excludeId) {
   return slug;
 }
 
-// Complete onboarding
-router.put('/onboarding', authMiddleware, uploadLogo.fields([
-  { name: 'logo', maxCount: 1 },
-]), async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPLETE ONBOARDING
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/onboarding', authMiddleware, uploadLogo.fields([{ name: 'logo', maxCount: 1 }]), async (req, res) => {
   try {
-    const { 
-      businessName,
-      ownerName, 
-      category, 
-      phone, 
-      location, 
-      tagline, 
-      description,
-      timezone,
-      facebook,
-      twitter,
-      instagram,
-      linkedin
+    const {
+      businessName, ownerName, category, phone, location,
+      tagline, description, timezone,
+      facebook, twitter, instagram, linkedin
     } = req.body;
 
     const business = await db.Business.findByPk(req.business.id);
+    if (!business) return res.status(404).json({ message: 'Business not found' });
 
-    if (!business) {
-      return res.status(404).json({ message: 'Business not found' });
-    }
-    
     const updateData = {
-      ownerName,
-      category,
-      phone,
-      location,
-      tagline,
-      description,
+      ownerName, category, phone, location, tagline, description,
       timezone: timezone || 'Asia/Manila',
-      facebook,
-      twitter,
-      instagram,
-      linkedin,
+      facebook, twitter, instagram, linkedin,
       onboardingCompleted: true
     };
 
-    // Only update businessName/slug if it changed
     if (businessName && businessName.trim() && businessName !== business.businessName) {
-      // Check if name is already taken by another business
       const existingBusiness = await db.Business.findOne({
-        where: { 
-          businessName,
-          id: { [db.Sequelize.Op.ne]: business.id }
-        }
+        where: { businessName, id: { [db.Sequelize.Op.ne]: business.id } }
       });
-
-      if (existingBusiness) {
-        return res.status(400).json({ message: 'Business name already taken' });
-      }
+      if (existingBusiness) return res.status(400).json({ message: 'Business name already taken' });
 
       updateData.businessName = businessName;
-      updateData.slug = await generateUniqueSlug(businessName, business.id); // ✅ using the helper
+      updateData.slug = await generateUniqueSlug(businessName, business.id);
     }
 
-    // Handle logo upload
     if (req.files?.logo) {
       updateData.logo = req.files.logo[0].path;
     }
 
-    await db.Business.update(updateData, {
-      where: { id: req.business.id }
-    });
+    await db.Business.update(updateData, { where: { id: req.business.id } });
 
     const updatedBusiness = await db.Business.findByPk(req.business.id, {
       attributes: { exclude: ['password'] }
     });
 
-    res.json({ 
-      message: 'Onboarding completed successfully',
-      business: updatedBusiness 
-    });
+    res.json({ message: 'Onboarding completed successfully', business: updatedBusiness });
   } catch (error) {
     console.error('Onboarding error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
-// Update business profile
-router.put('/profile', authMiddleware, uploadLogo.fields([
-  { name: 'logo', maxCount: 1 },
-]), async (req, res) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE PROFILE (includes maxConcurrentBookings + bufferTime)
+// ─────────────────────────────────────────────────────────────────────────────
+router.put('/profile', authMiddleware, uploadLogo.fields([{ name: 'logo', maxCount: 1 }]), async (req, res) => {
   try {
-    const { 
-      ownerName,
-      category,
-      phone, 
-      location, 
-      tagline,
-      description,
-      timezone,
-      facebook,
-      twitter,
-      instagram,
-      linkedin,
-      businessHours,
-      bufferTime
+    const {
+      ownerName, category, phone, location, tagline, description, timezone,
+      facebook, twitter, instagram, linkedin,
+      businessHours, bufferTime, maxConcurrentBookings
     } = req.body;
-    
+
     const updateData = {
-      ownerName,
-      category,
-      phone,
-      location,
-      tagline,
-      description,
-      timezone,
-      facebook,
-      twitter,
-      instagram,
-      linkedin,
-      bufferTime: bufferTime !== undefined ? (bufferTime || null) : undefined
+      ownerName, category, phone, location, tagline, description, timezone,
+      facebook, twitter, instagram, linkedin,
+      bufferTime: bufferTime !== undefined ? (bufferTime || null) : undefined,
+      maxConcurrentBookings: maxConcurrentBookings !== undefined
+        ? Math.max(1, parseInt(maxConcurrentBookings) || 1)
+        : undefined
     };
 
     if (req.files?.logo) {
       updateData.logo = req.files.logo[0].path;
     }
 
-    await db.Business.update(updateData, {
-      where: { id: req.business.id }
-    });
+    await db.Business.update(updateData, { where: { id: req.business.id } });
 
     if (businessHours) {
-      const hours = typeof businessHours === 'string' 
-        ? JSON.parse(businessHours) 
-        : businessHours;
+      const hours = typeof businessHours === 'string' ? JSON.parse(businessHours) : businessHours;
 
-      await db.Schedule.destroy({
-        where: { businessId: req.business.id }
-      });
+      await db.Schedule.destroy({ where: { businessId: req.business.id } });
 
       const schedulePromises = hours
-        .filter(hour => hour.enabled && hour.startTime && hour.endTime)
-        .map(hour => 
+        .filter(h => h.enabled && h.startTime && h.endTime)
+        .map(h =>
           db.Schedule.create({
             businessId: req.business.id,
-            dayOfWeek: hour.day,
-            startTime: hour.startTime,
-            endTime: hour.endTime,
-            enabled: hour.enabled,
-            hasRest: hour.hasRest || false,
-            restStartTime: hour.restStartTime || null,
-            restEndTime: hour.restEndTime || null
+            dayOfWeek: h.day,
+            startTime: h.startTime,
+            endTime: h.endTime,
+            enabled: h.enabled,
+            hasRest: h.hasRest || false,
+            restStartTime: h.restStartTime || null,
+            restEndTime: h.restEndTime || null
           })
         );
 
@@ -181,17 +124,16 @@ router.put('/profile', authMiddleware, uploadLogo.fields([
       include: [{ model: db.Schedule, as: 'schedules' }]
     });
 
-    res.json({ 
-      message: 'Profile updated successfully',
-      business: updatedBusiness 
-    });
+    res.json({ message: 'Profile updated successfully', business: updatedBusiness });
   } catch (error) {
     console.error('Update profile error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
-// Update booking policy 
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE BOOKING POLICY
+// ─────────────────────────────────────────────────────────────────────────────
 router.put('/booking-policy', authMiddleware, async (req, res) => {
   try {
     const { title, description, policyList } = req.body;
@@ -200,29 +142,26 @@ router.put('/booking-policy', authMiddleware, async (req, res) => {
       bookingPolicyTitle: title,
       bookingPolicyDescription: description,
       bookingPolicyList: policyList
-    }, {
-      where: { id: req.business.id }
-    });
+    }, { where: { id: req.business.id } });
 
     const updatedBusiness = await db.Business.findByPk(req.business.id, {
       attributes: { exclude: ['password'] }
     });
 
-    res.json({
-      message: 'Booking policy updated successfully',
-      business: updatedBusiness
-    });
+    res.json({ message: 'Booking policy updated successfully', business: updatedBusiness });
   } catch (error) {
     console.error('Update booking policy error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
-// Get business by slug
+// ─────────────────────────────────────────────────────────────────────────────
+// GET BUSINESS BY SLUG (public)
+// ─────────────────────────────────────────────────────────────────────────────
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
-    
+
     const business = await db.Business.findOne({
       where: { slug },
       attributes: { exclude: ['password'] },
@@ -234,9 +173,7 @@ router.get('/:slug', async (req, res) => {
       ]
     });
 
-    if (!business) {
-      return res.status(404).json({ message: 'Business not found' });
-    }
+    if (!business) return res.status(404).json({ message: 'Business not found' });
 
     res.json({ business });
   } catch (error) {
