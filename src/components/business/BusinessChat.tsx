@@ -53,7 +53,14 @@ export default function BusinessChat({
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
-  const [notificationSound] = useState(new Audio('/notification.mp3')); 
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+  const playNotificationSound = () => {
+    if (!notificationSoundRef.current) {
+      notificationSoundRef.current = new Audio('/notification.mp3');
+    }
+    notificationSoundRef.current.currentTime = 0;
+    notificationSoundRef.current.play().catch(() => {});
+  };
   const [isClientTyping, setIsClientTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -109,8 +116,8 @@ export default function BusinessChat({
       console.log('🔔 New message received:', data);
       
       // Play notification sound
-      notificationSound.play().catch(err => console.log('Audio play failed:', err));
-      
+      playNotificationSound();
+
       // Reload messages if chat is active with this client
       if (data.clientEmail && activeChat === data.clientEmail) {
         loadMessages(data.clientEmail, true);

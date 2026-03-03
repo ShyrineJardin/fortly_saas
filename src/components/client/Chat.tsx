@@ -163,7 +163,15 @@ export default function ChatWidget({
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
-  const [notificationSound] = useState(new Audio('/notification.mp3'));
+  // ── Lazy audio init — avoids browser autoplay block on mount ──
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+  const playNotificationSound = () => {
+    if (!notificationSoundRef.current) {
+      notificationSoundRef.current = new Audio('/notification.mp3');
+    }
+    notificationSoundRef.current.currentTime = 0;
+    notificationSoundRef.current.play().catch(() => {});
+  };
   const [isSubmittingWelcome, setIsSubmittingWelcome] = useState(false);
   const [isBusinessTyping, setIsBusinessTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -234,7 +242,7 @@ export default function ChatWidget({
       socketRef.current = io(socketUrl);
       socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
       socketRef.current.on('new-message', (data) => {
-        notificationSound.play().catch(() => {});
+        playNotificationSound();
         loadMessages(userEmail, true);
         if (document.hidden && Notification.permission === 'granted') {
           new Notification(`New message from ${data.businessName}`, {
