@@ -1,10 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation, useParams } from "react-router-dom"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import GalleryGrid from "./components/client/GalleryGrid"
 import ServicesPage from "./pages/client/ServicesPage"
 import ReviewsPage from "./pages/client/ReviewsPage"
 import BookingPage from "./pages/client/BookingPage"
 import ConfirmationPage from "./pages/client/ConfirmationPage"
+import { preloadNotificationSound } from "./utils/notificationSound"
 
 import LoginPage from './pages/business/LoginPage'
 import SignupPage from './pages/business/SignupPage'
@@ -103,6 +104,13 @@ function BusinessPageLayout() {
 }
 
 export default function App() {
+  // Preload notification sound on app initialization
+  useEffect(() => {
+    preloadNotificationSound().catch(error => {
+      console.warn('Failed to preload notification sound:', error);
+    });
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

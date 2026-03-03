@@ -190,11 +190,19 @@ router.post('/send-business', async (req, res) => {
 
     // Send real-time notification via Socket.IO
     if (io) {
-      io.to(`client-${businessSlug}-${clientEmail}`).emit('new-message', {
+      const roomName = `client-${businessSlug}-${clientEmail}`;
+      console.log(`📢 Emitting to room: ${roomName}`);
+      io.to(roomName).emit('new-message', {
         message: newMessage,
         sender: 'business',
-        businessName: business.businessName
+        businessName: business.businessName,
+        businessSlug: businessSlug,
+        clientEmail: clientEmail
       });
+      
+      // Also log connected clients in this room
+      const room = io.sockets.adapter.rooms.get(roomName);
+      console.log(`👥 Clients in room ${roomName}:`, room?.size || 0);
       console.log('🔔 Real-time notification sent to client');
     }
 
@@ -357,12 +365,19 @@ router.post('/send-client', async (req, res) => {
 
     // Send real-time notification via Socket.IO
     if (io) {
-      io.to(`business-${businessSlug}`).emit('new-message', {
+      const roomName = `business-${businessSlug}`;
+      console.log(`📢 Emitting to room: ${roomName}`);
+      io.to(roomName).emit('new-message', {
         message: newMessage,
         sender: 'client',
         clientName: clientName,
-        clientEmail: clientEmail
+        clientEmail: clientEmail,
+        businessSlug: businessSlug
       });
+      
+      // Also log connected clients in this room
+      const room = io.sockets.adapter.rooms.get(roomName);
+      console.log(`👥 Clients in room ${roomName}:`, room?.size || 0);
       console.log('🔔 Real-time notification sent to business');
     }
 

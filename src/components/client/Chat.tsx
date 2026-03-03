@@ -3,6 +3,7 @@ import { IoChatbubbleEllipsesOutline, IoSend, IoImageOutline } from "react-icons
 import { FaAngleDown, FaChevronLeft } from 'react-icons/fa6';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
+import { playNotificationSound, preloadNotificationSound } from '../../utils/notificationSound';
 
 interface ChatWidgetProps {
   businessSlug: string;
@@ -163,15 +164,6 @@ export default function ChatWidget({
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
-  // ── Lazy audio init — avoids browser autoplay block on mount ──
-  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
-  const playNotificationSound = () => {
-    if (!notificationSoundRef.current) {
-      notificationSoundRef.current = new Audio('/notification.mp3');
-    }
-    notificationSoundRef.current.currentTime = 0;
-    notificationSoundRef.current.play().catch(() => {});
-  };
   const [isSubmittingWelcome, setIsSubmittingWelcome] = useState(false);
   const [isBusinessTyping, setIsBusinessTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -239,24 +231,48 @@ export default function ChatWidget({
   useEffect(() => {
     if (userEmail && businessSlug) {
       const socketUrl = apiBaseUrl.replace('/api', '');
-      socketRef.current = io(socketUrl);
-      socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
-      socketRef.current.on('new-message', (data) => {
-        playNotificationSound();
-        loadMessages(userEmail, true);
+      socketRef.current = io(socketUrl, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5
+      });
+      
+      socketRef.current.on('connect', () => {
+        console.log('✅ Socket connected, joining room');
+        socketRef.current?.emit('join-client', { businessSlug, clientEmail: userEmail });
+      });
+      
+      socketRef.current.on('new-message', async (data) => {
+        console.log('🔔 New message received by client:', data);
+        await playNotificationSound();
+        
+        // Reload messages immediately
+        try {
+          await loadMessages(userEmail, true);
+          console.log('✅ Messages reloaded after new message');
+        } catch (error) {
+          console.error('❌ Failed to reload messages:', error);
+        }
+        
+        // Show browser notification
         if (document.hidden && Notification.permission === 'granted') {
           new Notification(`New message from ${data.businessName}`, {
-            body: data.message.message || 'New file received', icon: '/logo192.png',
+            body: data.message?.message || 'New message received', 
+            icon: '/logo192.png',
           });
         }
       });
+      
       socketRef.current.on('typing', (data) => {
         if (data.sender === 'business') setIsBusinessTyping(data.isTyping);
       });
+      
       if (Notification.permission === 'default') Notification.requestPermission();
     }
     return () => {
       if (socketRef.current) {
+        socketRef.current.off('connect');
         socketRef.current.off('new-message');
         socketRef.current.off('typing');
         socketRef.current.disconnect();
@@ -471,15 +487,21 @@ export default function ChatWidget({
         </button>
         <input
           type="text"
+          enterKeyHint="send"
           value={message}
           onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
           onKeyPress={handleKeyPress}
           placeholder="Message"
           className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
         />
-        <button onClick={handleSendMessage} className="p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors flex-shrink-0">
+        {!mobile && (
+        <button 
+          onClick={handleSendMessage} 
+          className="p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors flex-shrink-0"
+        >
           {IoSend({ size: 20 })}
         </button>
+      )}
       </div>
     </div>
   );

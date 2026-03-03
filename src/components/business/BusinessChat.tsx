@@ -4,6 +4,7 @@ import { FaAngleDown, FaChevronLeft } from 'react-icons/fa6';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 import { useLocation } from "react-router-dom";
+import { playNotificationSound, preloadNotificationSound } from '../../utils/notificationSound';
 
 interface Client {
   id: number;
@@ -53,14 +54,6 @@ export default function BusinessChat({
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
-  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
-  const playNotificationSound = () => {
-    if (!notificationSoundRef.current) {
-      notificationSoundRef.current = new Audio('/notification.mp3');
-    }
-    notificationSoundRef.current.currentTime = 0;
-    notificationSoundRef.current.play().catch(() => {});
-  };
   const [isClientTyping, setIsClientTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -106,30 +99,47 @@ export default function BusinessChat({
   // Initialize Socket.IO
   useEffect(() => {
     const socketUrl = apiBaseUrl.replace('/api', '');
-    socketRef.current = io(socketUrl);
+    socketRef.current = io(socketUrl, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5
+    });
   
-    // Join business room
-    socketRef.current.emit('join-business', businessSlug);
+    // Handle connection
+    socketRef.current.on('connect', () => {
+      console.log('✅ Socket connected, joining business room');
+      socketRef.current?.emit('join-business', businessSlug);
+    });
   
     // Listen for new messages
-    socketRef.current.on('new-message', (data) => {
+    socketRef.current.on('new-message', async (data) => {
       console.log('🔔 New message received:', data);
       
       // Play notification sound
-      playNotificationSound();
+      await playNotificationSound();
 
       // Reload messages if chat is active with this client
       if (data.clientEmail && activeChat === data.clientEmail) {
-        loadMessages(data.clientEmail, true);
+        try {
+          await loadMessages(data.clientEmail, true);
+          console.log('✅ Messages reloaded after new message');
+        } catch (error) {
+          console.error('❌ Failed to reload messages:', error);
+        }
       }
       
       // Reload client list to update last message
-      loadClients();
+      try {
+        await loadClients();
+      } catch (error) {
+        console.error('❌ Failed to reload clients:', error);
+      }
       
       // Show browser notification
       if (document.hidden && Notification.permission === 'granted') {
         new Notification(`New message from ${data.clientName}`, {
-          body: data.message.message || 'New file received',
+          body: data.message?.message || 'New file received',
           icon: '/logo192.png',
           badge: '/logo192.png',
           tag: data.clientEmail
@@ -150,6 +160,7 @@ export default function BusinessChat({
   
     return () => {
       if (socketRef.current) {
+        socketRef.current.off('connect');
         socketRef.current.off('new-message');
         socketRef.current.off('typing');
         socketRef.current.disconnect();
