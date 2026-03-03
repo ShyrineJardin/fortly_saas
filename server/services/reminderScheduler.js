@@ -24,7 +24,7 @@ const startReminderScheduler = () => {
       const upcomingBookings = await db.Booking.findAll({
         where: {
           status: { [Op.in]: ['pending', 'confirmed'] },
-          reminderSent: false,
+          reminderSent: { [Op.ne]: true }, // false or null (not yet sent)
           [Op.or]: [
             // Same date, time in window
             {
@@ -62,6 +62,7 @@ const startReminderScheduler = () => {
       }
     } catch (err) {
       console.error('❌ Reminder scheduler error:', err.message);
+      console.error('❌ Full error:', err);
     }
   });
 

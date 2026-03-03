@@ -77,7 +77,8 @@ module.exports = (sequelize, DataTypes) => {
     // Reminder tracking
     reminderSent: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false
+      defaultValue: false,
+      allowNull: true  // Allow null during migration
     },
     // Cancellation info
     cancelledBy: {

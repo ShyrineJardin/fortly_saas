@@ -136,15 +136,37 @@ db.sequelize.authenticate()
   .then(async () => {                          
     console.log('✅ Database synced');
 
-    // ── One-time migration: add reminderSent if column doesn't exist ──
+    // ── Migration: ensure reminderSent column exists ──
     try {
-      await db.sequelize.query(`
-        ALTER TABLE "Bookings"
-        ADD COLUMN IF NOT EXISTS "reminderSent" BOOLEAN NOT NULL DEFAULT false;
-      `);
-      console.log('✅ reminderSent column ready');
+      // First, check if the column exists
+      const queryInterface = db.sequelize.getQueryInterface();
+      const tableDescription = await queryInterface.describeTable('Bookings');
+      
+      if (!tableDescription.reminderSent) {
+        console.log('📋 Adding reminderSent column to Bookings table...');
+        
+        // Add the column with proper error handling
+        await db.sequelize.query(`
+          ALTER TABLE "Bookings"
+          ADD COLUMN "reminderSent" BOOLEAN NOT NULL DEFAULT false;
+        `);
+        console.log('✅ reminderSent column added successfully');
+      } else {
+        console.log('✅ reminderSent column already exists');
+      }
     } catch (err) {
-      console.error('⚠️ reminderSent migration warning:', err.message);
+      console.error('❌ Migration error - reminderSent column:', err.message);
+      // Try alternative approach for PostgreSQL
+      try {
+        await db.sequelize.query(`
+          ALTER TABLE "Bookings"
+          ADD COLUMN IF NOT EXISTS "reminderSent" BOOLEAN DEFAULT false;
+        `);
+        console.log('✅ reminderSent column added (via IF NOT EXISTS)');
+      } catch (altErr) {
+        console.error('❌ Alternative migration also failed:', altErr.message);
+        console.error('⚠️ Please manually run: ALTER TABLE "Bookings" ADD COLUMN "reminderSent" BOOLEAN DEFAULT false;');
+      }
     }
 
     // Start reminder scheduler after DB is ready
