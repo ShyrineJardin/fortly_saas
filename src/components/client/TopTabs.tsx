@@ -47,7 +47,6 @@ export default function TopTabs() {
               {tab.name}
             </span>
 
-            {/* Active indicator */}
             {isActive && (
               <div className="absolute bottom-0 w-full h-[3px] bg-primaryGreen rounded-t-md" />
             )}
