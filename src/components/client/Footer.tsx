@@ -26,7 +26,7 @@ export default function Footer() {
           <p className="text-footerTextPrimary lg:text-base  md:text-sm text-xs md:text-right">
             Turn your business into a shareable page, let clients book instantly, 
             and chat all in one place — with <span className="text-white font-semibold">Fortly</span>. 
-            Start free today, just click <span className="font-semibold text-primaryGreen"><a href="/signup">here</a></span>!.
+            Start free today, just click <span className="font-semibold text-primaryGreen"><a href="https://fortly.xyz/">here</a></span>!.
           </p>
         </div>
       </div>

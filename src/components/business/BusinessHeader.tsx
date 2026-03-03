@@ -60,6 +60,7 @@ export default function BusinessHeader() {
   };
 
   const handleUnlockPro = () => {
+    setIsMenuOpen(false);
     setIsTrialModalOpen(true);
   };
 
@@ -249,10 +250,10 @@ export default function BusinessHeader() {
       {isTrialModalOpen && (
         <>
           <div 
-            className="fixed inset-0 bg-black bg-opacity-40 z-50" 
+            className="fixed inset-0 bg-black bg-opacity-40 z-[60]" 
             onClick={() => setIsTrialModalOpen(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 bg-white rounded-2xl shadow-xl z-50 p-6 flex flex-col items-center text-center">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 bg-white rounded-2xl shadow-xl z-[60] p-6 flex flex-col items-center text-center">
             
             <button 
               onClick={() => setIsTrialModalOpen(false)}
@@ -361,10 +362,10 @@ export default function BusinessHeader() {
       {isSettingsOpen && (
         <>
           <div 
-            className="fixed inset-0 bg-black bg-opacity-50 z-50" 
+            className="fixed inset-0 bg-black bg-opacity-50 z-[60]" 
             onClick={() => setIsSettingsOpen(false)}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-11/12 max-w-2xl bg-white rounded-2xl shadow-2xl z-50 max-h-[90vh] overflow-y-auto">
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-11/12 max-w-2xl bg-white rounded-2xl shadow-2xl z-[60] max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Settings</h2>
