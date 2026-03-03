@@ -3,7 +3,13 @@ import { FaCalendar, FaClock, FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaSti
 import { HiCalendar } from "react-icons/hi2";
 import { bookingsAPI } from '../../utils/api';
 
-// ── Service type badge config (matches ServiceCard) ──
+// ── Helper: save to localStorage AND notify sibling widgets on the same tab ──
+const setLocalStorageWithEvent = (key: string, value: string) => {
+  localStorage.setItem(key, value);
+  window.dispatchEvent(new CustomEvent('localStorageUpdate', { detail: { key, value } }));
+};
+
+// ── Service type badge config ──
 const SERVICE_TYPE_CONFIG: Record<string, { icon: string; label: string; color: string }> = {
   appointment: { icon: '📅', label: 'Appointment',        color: 'bg-blue-50 text-blue-700 border-blue-100' },
   preparation: { icon: '🎂', label: 'Preparation / Order', color: 'bg-orange-50 text-orange-700 border-orange-100' },
@@ -59,7 +65,50 @@ const LoadingSpinner = () => (
   </svg>
 );
 
-// ==================== BOOKING CARD COMPONENT ====================
+// ── EmailForm defined OUTSIDE the main component so it never remounts on re-render ──
+const EmailForm = ({
+  emailInput,
+  setEmailInput,
+  emailError,
+  checkingEmail,
+  onSubmit
+}: {
+  emailInput: string;
+  setEmailInput: (v: string) => void;
+  emailError: string;
+  checkingEmail: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+}) => (
+  <div className="flex flex-col items-center justify-center py-12 px-6">
+    <div className="bg-primaryGreen bg-opacity-10 p-6 rounded-full mb-4">
+      {HiCalendar({ className: "text-primaryGreen", size: 48 })}
+    </div>
+    <h3 className="text-lg font-semibold text-gray-900 mb-2">Find Your Appointments</h3>
+    <p className="text-gray-500 text-sm text-center mb-6">Enter your email address to view your bookings.</p>
+    <form onSubmit={onSubmit} className="w-full max-w-sm space-y-3">
+      <input
+        type="email"
+        value={emailInput}
+        onChange={(e) => setEmailInput(e.target.value)}
+        placeholder="your@email.com"
+        required
+        disabled={checkingEmail}
+        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm disabled:opacity-50"
+      />
+      {emailError && <p className="text-xs text-red-600">{emailError}</p>}
+      <button
+        type="submit"
+        disabled={checkingEmail || !emailInput.trim()}
+        className="w-full py-3 bg-primaryGreen text-white rounded-lg font-semibold text-sm hover:bg-hoverGreen transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        {checkingEmail && <LoadingSpinner />}
+        {checkingEmail ? "Searching..." : "View My Appointments"}
+      </button>
+    </form>
+  </div>
+);
+
+// ── BookingCard defined OUTSIDE main component for the same reason ──
 const BookingCard = ({ booking, onCancelSuccess }: { booking: Booking; onCancelSuccess: () => void; }) => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -84,14 +133,10 @@ const BookingCard = ({ booking, onCancelSuccess }: { booking: Booking; onCancelS
 
   const getStatusBadge = () => {
     switch (booking.status) {
-      case 'pending':
-        return <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">{FaHourglassHalf({size:10})}Pending</span>;
-      case 'confirmed':
-        return <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">{FaCheckCircle({size:10})}Confirmed</span>;
-      case 'completed':
-        return <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">{FaCheckCircle({size:10})}Completed</span>;
-      case 'cancelled':
-        return <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">{FaTimesCircle({size:10})}Cancelled</span>;
+      case 'pending':   return <span className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">{FaHourglassHalf({size:10})}Pending</span>;
+      case 'confirmed': return <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">{FaCheckCircle({size:10})}Confirmed</span>;
+      case 'completed': return <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">{FaCheckCircle({size:10})}Completed</span>;
+      case 'cancelled': return <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">{FaTimesCircle({size:10})}Cancelled</span>;
       default: return null;
     }
   };
@@ -114,7 +159,6 @@ const BookingCard = ({ booking, onCancelSuccess }: { booking: Booking; onCancelS
   return (
     <>
       <div className={`bg-white rounded-xl border-2 overflow-hidden transition-all ${isUpcoming ? 'border-primaryGreen' : 'border-gray-200'}`}>
-        {/* Service image header */}
         <div className="relative">
           {booking.Service.image ? (
             <img src={booking.Service.image} alt={booking.Service.name} className="w-full h-40 object-cover" />
@@ -133,7 +177,6 @@ const BookingCard = ({ booking, onCancelSuccess }: { booking: Booking; onCancelS
             <p className="text-sm text-gray-500">{booking.Service.duration} • {booking.Service.price}</p>
           </div>
 
-          {/* Date & Time */}
           <div className="space-y-2 mb-4">
             <div className="flex items-center gap-2 text-sm text-gray-700">
               {FaCalendar({className: "text-primaryGreen flex-shrink-0", size:14})}
@@ -145,7 +188,6 @@ const BookingCard = ({ booking, onCancelSuccess }: { booking: Booking; onCancelS
             </div>
           </div>
 
-          {/* Client Details */}
           <div className="border-t border-gray-200 pt-4 space-y-2 mb-4">
             <div className="flex items-center gap-2 text-xs text-gray-600">{FaUser({className: "text-gray-400 flex-shrink-0", size:12})}<span>{booking.clientName}</span></div>
             <div className="flex items-center gap-2 text-xs text-gray-600">{FaEnvelope({className: "text-gray-400 flex-shrink-0", size:12})}<span className="truncate">{booking.clientEmail}</span></div>
@@ -221,10 +263,20 @@ const BookingCard = ({ booking, onCancelSuccess }: { booking: Booking; onCancelS
   );
 };
 
+// ── EmptyState also outside to be safe ──
+const EmptyState = ({ tab }: { tab: string }) => (
+  <div className="flex flex-col items-center justify-center py-12">
+    <div className="bg-gray-100 p-6 rounded-full mb-4">{HiCalendar({className: "text-gray-400", size:48})}</div>
+    <h3 className="text-lg font-semibold text-gray-900 mb-2">No {tab} appointments</h3>
+    <p className="text-gray-500 text-sm text-center max-w-sm">
+      {tab === 'upcoming' ? "You don't have any upcoming appointments scheduled yet." : "You don't have any past appointments."}
+    </p>
+  </div>
+);
+
 // ==================== MAIN APPOINTMENT WIDGET ====================
 export default function AppointmentWidget({ businessSlug }: AppointmentWidgetProps) {
 
-  // ── Resolve email from any known localStorage source ──
   const resolveStoredEmail = () =>
     localStorage.getItem(`appointment_${businessSlug}_email`) ||
     localStorage.getItem(`chat_${businessSlug}_email`) ||
@@ -242,13 +294,11 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // ── When widget opens, check for stored email or show email form ──
   useEffect(() => {
     if (isOpen) {
       const email = resolveStoredEmail();
       if (email) {
         setClientEmail(email);
-        // Pass email directly to avoid stale state
         loadBookings(email);
       } else {
         setShowEmailForm(true);
@@ -259,10 +309,29 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
   useEffect(() => {
     const handleOpenAppointment = () => setIsOpen(true);
     window.addEventListener('openAppointment', handleOpenAppointment);
-    return () => window.removeEventListener('openAppointment', handleOpenAppointment);
-  }, []);
 
-  // ── Accept email param to avoid stale closure ──
+    const handleLocalStorageUpdate = (e: CustomEvent) => {
+      const relevantKeys = [
+        `chat_${businessSlug}_email`,
+        `booking_${businessSlug}_email`,
+        `appointment_${businessSlug}_email`
+      ];
+      if (relevantKeys.includes(e.detail.key) && !clientEmail) {
+        const newEmail = resolveStoredEmail();
+        if (newEmail) {
+          setClientEmail(newEmail);
+          setShowEmailForm(false);
+        }
+      }
+    };
+    window.addEventListener('localStorageUpdate', handleLocalStorageUpdate as EventListener);
+
+    return () => {
+      window.removeEventListener('openAppointment', handleOpenAppointment);
+      window.removeEventListener('localStorageUpdate', handleLocalStorageUpdate as EventListener);
+    };
+  }, [businessSlug, clientEmail]);
+
   const loadBookings = async (emailOverride?: string) => {
     const email = emailOverride || clientEmail;
     if (!email) return;
@@ -279,7 +348,6 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
     }
   };
 
-  // ── Email form submission: look up bookings by email ──
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError("");
@@ -288,7 +356,7 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
       const response = await bookingsAPI.getClientBookings(emailInput.trim(), { businessSlug });
       const found = response.data.bookings || [];
       if (found.length > 0) {
-        localStorage.setItem(`appointment_${businessSlug}_email`, emailInput.trim());
+        setLocalStorageWithEvent(`appointment_${businessSlug}_email`, emailInput.trim());
         setClientEmail(emailInput.trim());
         setShowEmailForm(false);
         setBookings(found);
@@ -310,59 +378,6 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
 
   const displayedBookings = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
 
-  // ── Email lookup form (shown when no stored email found) ──
-  const EmailForm = () => (
-    <div className="flex flex-col items-center justify-center py-12 px-6">
-      <div className="bg-primaryGreen bg-opacity-10 p-6 rounded-full mb-4">
-        {HiCalendar({ className: "text-primaryGreen", size: 48 })}
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Find Your Appointments</h3>
-      <p className="text-gray-500 text-sm text-center mb-6">
-        Enter your email address to view your bookings.
-      </p>
-      <form onSubmit={handleEmailSubmit} className="w-full max-w-sm space-y-3">
-        <input
-          type="email"
-          value={emailInput}
-          onChange={(e) => setEmailInput(e.target.value)}
-          placeholder="your@email.com"
-          required
-          disabled={checkingEmail}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm disabled:opacity-50"
-        />
-        {emailError && (
-          <p className="text-xs text-red-600">{emailError}</p>
-        )}
-        <button
-          type="submit"
-          disabled={checkingEmail || !emailInput.trim()}
-          className="w-full py-3 bg-primaryGreen text-white rounded-lg font-semibold text-sm hover:bg-hoverGreen transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {checkingEmail && <LoadingSpinner />}
-          {checkingEmail ? "Searching..." : "View My Appointments"}
-        </button>
-      </form>
-    </div>
-  );
-
-  const EmptyState = ({ tab }: { tab: string }) => (
-    <div className="flex flex-col items-center justify-center py-12">
-      <div className="bg-gray-100 p-6 rounded-full mb-4">{HiCalendar({className: "text-gray-400", size:48})}</div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">No {tab} appointments</h3>
-      <p className="text-gray-500 text-sm text-center max-w-sm">
-        {tab === 'upcoming' ? "You don't have any upcoming appointments scheduled yet." : "You don't have any past appointments."}
-      </p>
-    </div>
-  );
-
-  const Content = () => {
-    if (showEmailForm) return <EmailForm />;
-    if (loading) return <div className="flex flex-col items-center justify-center py-12"><div className="w-12 h-12 border-4 border-primaryGreen border-t-transparent rounded-full animate-spin mb-4"></div><p className="text-gray-500">Loading your appointments...</p></div>;
-    if (error) return <div className="flex flex-col items-center justify-center py-12"><div className="text-red-500 mb-4">{FaTimes({size:48})}</div><p className="text-gray-700 font-medium mb-2">{error}</p><button onClick={() => loadBookings()} className="text-primaryGreen hover:text-hoverGreen font-medium text-sm">Try again</button></div>;
-    if (displayedBookings.length === 0) return <EmptyState tab={activeTab} />;
-    return null;
-  };
-
   return (
     <>
       {/* DESKTOP FLOATING BUTTON */}
@@ -377,8 +392,6 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
         <div className="hidden lg:block">
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-
-              {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <div className="flex items-center gap-3">
                   <div className="bg-primaryGreen bg-opacity-10 p-3 rounded-full">{HiCalendar({className: "text-primaryGreen", size:24})}</div>
@@ -390,7 +403,6 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
                 <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">{FaTimes({className: "text-gray-500", size:20})}</button>
               </div>
 
-              {/* Tab bar — hidden when showing email form */}
               {!showEmailForm && (
                 <div className="flex border-b border-gray-200 px-6">
                   {(['upcoming', 'past'] as const).map(tab => (
@@ -401,16 +413,38 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
                 </div>
               )}
 
-              {/* Content */}
               <div className="flex-1 overflow-y-auto p-6">
-                <Content />
+                {showEmailForm && (
+                  <EmailForm
+                    emailInput={emailInput}
+                    setEmailInput={setEmailInput}
+                    emailError={emailError}
+                    checkingEmail={checkingEmail}
+                    onSubmit={handleEmailSubmit}
+                  />
+                )}
+                {!showEmailForm && loading && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="w-12 h-12 border-4 border-primaryGreen border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p className="text-gray-500">Loading your appointments...</p>
+                  </div>
+                )}
+                {!showEmailForm && error && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="text-red-500 mb-4">{FaTimes({size:48})}</div>
+                    <p className="text-gray-700 font-medium mb-2">{error}</p>
+                    <button onClick={() => loadBookings()} className="text-primaryGreen hover:text-hoverGreen font-medium text-sm">Try again</button>
+                  </div>
+                )}
+                {!showEmailForm && !loading && !error && displayedBookings.length === 0 && (
+                  <EmptyState tab={activeTab} />
+                )}
                 {!showEmailForm && displayedBookings.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {displayedBookings.map(booking => <BookingCard key={booking.id} booking={booking} onCancelSuccess={() => loadBookings()} />)}
                   </div>
                 )}
               </div>
-
             </div>
           </div>
         </div>
@@ -419,8 +453,6 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
       {/* MOBILE FULLSCREEN */}
       {isOpen && (
         <div className="lg:hidden fixed inset-0 bg-white z-50 flex flex-col">
-
-          {/* Mobile header */}
           <div className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
             <div className="flex items-center gap-3">
               <button onClick={() => setIsOpen(false)} className="p-2 -ml-2">{FaChevronLeft({size:20})}</button>
@@ -434,7 +466,6 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
             </div>
           </div>
 
-          {/* Tab bar — hidden when showing email form */}
           {!showEmailForm && (
             <div className="flex border-b border-gray-200 bg-white sticky top-[57px] z-10">
               {(['upcoming', 'past'] as const).map(tab => (
@@ -445,16 +476,38 @@ export default function AppointmentWidget({ businessSlug }: AppointmentWidgetPro
             </div>
           )}
 
-          {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-            <Content />
+            {showEmailForm && (
+              <EmailForm
+                emailInput={emailInput}
+                setEmailInput={setEmailInput}
+                emailError={emailError}
+                checkingEmail={checkingEmail}
+                onSubmit={handleEmailSubmit}
+              />
+            )}
+            {!showEmailForm && loading && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-12 h-12 border-4 border-primaryGreen border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-gray-500">Loading your appointments...</p>
+              </div>
+            )}
+            {!showEmailForm && error && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="text-red-500 mb-4">{FaTimes({size:48})}</div>
+                <p className="text-gray-700 font-medium mb-2">{error}</p>
+                <button onClick={() => loadBookings()} className="text-primaryGreen hover:text-hoverGreen font-medium text-sm">Try again</button>
+              </div>
+            )}
+            {!showEmailForm && !loading && !error && displayedBookings.length === 0 && (
+              <EmptyState tab={activeTab} />
+            )}
             {!showEmailForm && displayedBookings.length > 0 && (
               <div className="space-y-4">
                 {displayedBookings.map(booking => <BookingCard key={booking.id} booking={booking} onCancelSuccess={() => loadBookings()} />)}
               </div>
             )}
           </div>
-
         </div>
       )}
     </>
