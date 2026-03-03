@@ -18,8 +18,9 @@ const galleryRoutes = require('./routes/gallery');
 const bookingRoutes = require('./routes/bookings');
 const chatRoutes = require('./routes/chat');
 const reviewRoutes = require('./routes/reviews');
-const googleCalendarRoutes = require('./routes/googleCalendar'); 
+const googleCalendarRoutes = require('./routes/googleCalendar');
 const googleAuthRoutes = require('./routes/google-auth');
+const { startReminderScheduler } = require('./services/reminderScheduler');
 
 // Now we can use sequelize and DataTypes
 const ClientCalendarToken = require('./models/ClientCalendarToken')(sequelize, DataTypes);
@@ -79,12 +80,12 @@ io.on('connection', (socket) => {
 
   socket.on('typing', (data) => {
     if (data.sender === 'business') {
-      io.to(`client-${data.businessSlug}-${data.clientEmail}`).emit('typing', { 
+      io.to(`client-${data.businessSlug}-${data.clientEmail}`).emit('typing', {
         isTyping: data.isTyping,
-        sender: 'business' 
+        sender: 'business'
       });
     } else {
-      io.to(`business-${data.businessSlug}`).emit('typing', { 
+      io.to(`business-${data.businessSlug}`).emit('typing', {
         isTyping: data.isTyping,
         sender: 'client',
         clientEmail: data.clientEmail,
@@ -102,19 +103,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Database connection
-db.sequelize.authenticate()
-  .then(() => {
-    console.log('✅ Database connected successfully');
-    return db.sequelize.sync({ alter: true });
-  })
-  .then(() => {
-    console.log('✅ Database synced');
-  })
-  .catch(err => {
-    console.error('❌ Database connection error:', err);
-  });
-
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/business', businessRoutes);
@@ -123,7 +111,7 @@ app.use('/api/gallery', galleryRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
-app.use('/api/googleCalendar', googleCalendarRoutes); 
+app.use('/api/googleCalendar', googleCalendarRoutes);
 app.use('/api/auth', googleAuthRoutes);
 
 // Health check
@@ -137,9 +125,28 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-// Start server
+// Start server — single entry point
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📧 Resend email configured`);
-});
+
+db.sequelize.authenticate()
+  .then(() => {
+    console.log('✅ Database connected successfully');
+    return db.sequelize.sync({ alter: true });
+  })
+  .then(() => {
+    console.log('✅ Database synced');
+
+    // Start the HTTP + Socket.IO server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📧 Resend email configured`);
+
+      // Start reminder scheduler after DB is ready
+      startReminderScheduler();
+      console.log('⏰ Reminder scheduler started');
+    });
+  })
+  .catch(err => {
+    console.error('❌ Database connection error:', err);
+    process.exit(1);
+  });

@@ -74,6 +74,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: true
     },
+    // Reminder tracking
+    reminderSent: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
     // Cancellation info
     cancelledBy: {
       type: DataTypes.ENUM('client', 'business'),
