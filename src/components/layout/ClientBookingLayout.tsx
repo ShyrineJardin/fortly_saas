@@ -62,7 +62,6 @@ export default function ClientBookingLayout({ sidebar, children, footer }: Props
 
       <AppointmentWidget
         businessSlug={businessSlug || ""}
-        clientEmail={clientEmail}
       />
 
       <ChatWidget 

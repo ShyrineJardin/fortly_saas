@@ -137,7 +137,7 @@ export default function BusinessHeader() {
                           rel="noopener noreferrer" 
                           className="hover:opacity-80 transition-opacity"
                         >
-                          <span className="text-xs text-gray-500">fortly.io/</span>
+                          <span className="text-xs text-gray-500">fortly.xyz/</span>
                           <span className="text-xs font-semibold text-hoverGreen">{businessData.slug}</span>
                         </a>
                         <button 
@@ -190,7 +190,7 @@ export default function BusinessHeader() {
                         rel="noopener noreferrer" 
                         className="hover:opacity-80 transition-opacity"
                       >
-                        <span className="text-sm text-gray-500">fortly.io/</span>
+                        <span className="text-sm text-gray-500">fortly.xyz/</span>
                         <span className="text-sm font-bold text-hoverGreen">{businessData.slug}</span>
                       </a>
                       <button 

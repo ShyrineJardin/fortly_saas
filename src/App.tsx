@@ -40,10 +40,6 @@ function UnifiedClientLayout() {
   const isBookingFlow = pathname.includes('/booking')
   const isConfirmationFlow = pathname.includes('/confirmation')
 
-  const clientEmail = localStorage.getItem(`chat_${businessSlug}_email`)
-    || localStorage.getItem(`booking_${businessSlug}_email`)
-    || ""
-
   return (
     <div className='flex flex-col min-h-screen'>
       <div className='lg:hidden'>
@@ -74,7 +70,6 @@ function UnifiedClientLayout() {
       {!isConfirmationFlow && (
         <AppointmentWidget
           businessSlug={businessSlug || ""}
-          clientEmail={clientEmail}
         />
       )}
 
