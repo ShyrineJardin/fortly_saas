@@ -301,7 +301,8 @@ router.put('/:id/reschedule', async (req, res) => {
       bookingDate,
       bookingTime,
       bookingEndDate: endDate !== bookingDate ? endDate : null,
-      bookingEndTime: endTime
+      bookingEndTime: endTime,
+      reminderSent: false // reset reminder flag on reschedule
     });
 
     res.json({ message: 'Booking rescheduled successfully', booking });
