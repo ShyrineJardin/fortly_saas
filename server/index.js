@@ -133,17 +133,28 @@ db.sequelize.authenticate()
     console.log('✅ Database connected successfully');
     return db.sequelize.sync({ alter: true });
   })
-  .then(() => {
+  .then(async () => {                          
     console.log('✅ Database synced');
+
+    // ── One-time migration: add reminderSent if column doesn't exist ──
+    try {
+      await db.sequelize.query(`
+        ALTER TABLE "Bookings"
+        ADD COLUMN IF NOT EXISTS "reminderSent" BOOLEAN NOT NULL DEFAULT false;
+      `);
+      console.log('✅ reminderSent column ready');
+    } catch (err) {
+      console.error('⚠️ reminderSent migration warning:', err.message);
+    }
+
+    // Start reminder scheduler after DB is ready
+    startReminderScheduler();
+    console.log('⏰ Reminder scheduler started');
 
     // Start the HTTP + Socket.IO server
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📧 Resend email configured`);
-
-      // Start reminder scheduler after DB is ready
-      startReminderScheduler();
-      console.log('⏰ Reminder scheduler started');
     });
   })
   .catch(err => {
