@@ -21,6 +21,7 @@ const reviewRoutes = require('./routes/reviews');
 const googleCalendarRoutes = require('./routes/googleCalendar');
 const googleAuthRoutes = require('./routes/google-auth');
 const { startReminderScheduler } = require('./services/reminderScheduler');
+const adminRoutes = require('./routes/admin');
 
 // Now we can use sequelize and DataTypes
 const ClientCalendarToken = require('./models/ClientCalendarToken')(sequelize, DataTypes);
@@ -113,6 +114,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/googleCalendar', googleCalendarRoutes);
 app.use('/api/auth', googleAuthRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -178,6 +180,36 @@ db.sequelize.authenticate()
       }
     }
     console.log('✅ Migrations complete');
+
+    // ── Auto-create default admin if none exists ──
+    try {
+      const adminCount = await db.sequelize.query(
+        'SELECT COUNT(*) as count FROM "Admins"',
+        { type: db.Sequelize.QueryTypes.SELECT }
+      );
+      const count = parseInt(adminCount[0].count);
+      if (count === 0) {
+        const bcrypt = require('bcryptjs');
+        const hashedPassword = await bcrypt.hash(process.env.ADMIN_DEFAULT_PASSWORD, 10);
+        await db.sequelize.query(`
+          INSERT INTO "Admins" ("id", "email", "password", "name", "role", "isActive", "createdAt", "updatedAt")
+          VALUES (gen_random_uuid(), :email, :password, 'Super Admin', 'super_admin', true, NOW(), NOW())
+        `, {
+          replacements: {
+            email: process.env.ADMIN_EMAIL,
+            password: hashedPassword
+          },
+          type: db.Sequelize.QueryTypes.INSERT
+        });
+        console.log('✅ Default admin created:', process.env.ADMIN_EMAIL || 'admin@fortly.xyz');
+        console.log('🔑 Password:', process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@Fortly2024!');
+        console.log('⚠️  Change this password immediately via Admin Settings!');
+      } else {
+        console.log('✅ Admin account exists');
+      }
+    } catch (err) {
+      console.warn('⚠️  Admin seed warning:', err.message);
+    }
 
     // Start reminder scheduler after DB is ready
     startReminderScheduler();
