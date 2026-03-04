@@ -1,3 +1,10 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const db = require('../config/database');
+const adminAuth = require('../middleware/adminAuth');
+
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
