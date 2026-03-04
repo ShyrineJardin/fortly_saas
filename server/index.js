@@ -202,7 +202,8 @@ db.sequelize.authenticate()
     // ── Force reset admin password on every deploy (remove after confirmed working) ──
     try {
       const bcrypt = require('bcryptjs');
-      const hashedPassword = await bcrypt.hash(process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@Fortly2024!', 10);
+      const plainPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Fortly2024';
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
       await db.sequelize.query(`
         UPDATE "Admins" SET 
           "password" = :password,
@@ -216,7 +217,10 @@ db.sequelize.authenticate()
         },
         type: db.Sequelize.QueryTypes.UPDATE
       });
-      console.log('✅ Admin password reset to default');
+      // Verify hash works immediately after creation
+      const testMatch = await bcrypt.compare(plainPassword, hashedPassword);
+      console.log('🔐 bcrypt self-test:', testMatch ? '✅ PASS' : '❌ FAIL - hash broken');
+      console.log('✅ Admin password reset to:', plainPassword);
       console.log('📧 Admin email:', process.env.ADMIN_EMAIL || 'admin@fortly.xyz');
     } catch (err) {
       console.warn('⚠️  Admin reset warning:', err.message);
@@ -231,7 +235,8 @@ db.sequelize.authenticate()
       const count = parseInt(adminCount[0].count);
       if (count === 0) {
         const bcrypt = require('bcryptjs');
-        const hashedPassword = await bcrypt.hash(process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@Fortly2024!', 10);
+        const plainPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Fortly2024';
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
         await db.sequelize.query(`
           INSERT INTO "Admins" ("id", "email", "password", "name", "role", "isActive", "createdAt", "updatedAt")
           VALUES (gen_random_uuid(), :email, :password, 'Super Admin', 'super_admin', true, NOW(), NOW())
@@ -243,7 +248,7 @@ db.sequelize.authenticate()
           type: db.Sequelize.QueryTypes.INSERT
         });
         console.log('✅ Default admin created:', process.env.ADMIN_EMAIL || 'admin@fortly.xyz');
-        console.log('🔑 Password:', process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@Fortly2024!');
+        console.log('🔑 Password:', process.env.ADMIN_DEFAULT_PASSWORD || 'Fortly2024');
         console.log('⚠️  Change this password immediately via Admin Settings!');
       } else {
         console.log('✅ Admin account exists');
