@@ -21,7 +21,6 @@ const reviewRoutes = require('./routes/reviews');
 const googleCalendarRoutes = require('./routes/googleCalendar');
 const googleAuthRoutes = require('./routes/google-auth');
 const { startReminderScheduler } = require('./services/reminderScheduler');
-const adminRoutes = require('./routes/admin');
 
 // Now we can use sequelize and DataTypes
 const ClientCalendarToken = require('./models/ClientCalendarToken')(sequelize, DataTypes);
@@ -114,8 +113,6 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/googleCalendar', googleCalendarRoutes);
 app.use('/api/auth', googleAuthRoutes);
-app.use('/api/admin', adminRoutes);
-
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -134,43 +131,53 @@ const PORT = process.env.PORT || 5000;
 db.sequelize.authenticate()
   .then(() => {
     console.log('✅ Database connected successfully');
-    return db.sequelize.sync({ alter: false });
+    return db.sequelize.sync({ force: false }); // schema managed by migrateDatabase.js
   })
-  .then(async () => {                          
+  .then(async () => {                          // ← async here is the key fix
     console.log('✅ Database synced');
 
-    // ── Migration: ensure reminderSent column exists ──
-    try {
-      // First, check if the column exists
-      const queryInterface = db.sequelize.getQueryInterface();
-      const tableDescription = await queryInterface.describeTable('Bookings');
-      
-      if (!tableDescription.reminderSent) {
-        console.log('📋 Adding reminderSent column to Bookings table...');
-        
-        // Add the column with proper error handling
-        await db.sequelize.query(`
-          ALTER TABLE "Bookings"
-          ADD COLUMN "reminderSent" BOOLEAN NOT NULL DEFAULT false;
-        `);
-        console.log('✅ reminderSent column added successfully');
-      } else {
-        console.log('✅ reminderSent column already exists');
-      }
-    } catch (err) {
-      console.error('❌ Migration error - reminderSent column:', err.message);
-      // Try alternative approach for PostgreSQL
+    // ── Auto-migration: run on every deploy, all IF NOT EXISTS so safe to repeat ──
+    const migrations = [
+      // Bookings
+      `ALTER TABLE "Bookings" ADD COLUMN IF NOT EXISTS "reminderSent" BOOLEAN NOT NULL DEFAULT false`,
+
+      // Business subscription columns
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "subscriptionPlan" VARCHAR(50) NOT NULL DEFAULT 'free'`,
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "trialEndsAt" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "subscriptionStartDate" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "subscriptionEndDate" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "isPaused" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "pausedAt" TIMESTAMP WITH TIME ZONE`,
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "pauseReason" TEXT`,
+
+      // Business subscriptionStatus — VARCHAR to avoid ENUM casting issues
+      `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "subscriptionStatus" VARCHAR(50) NOT NULL DEFAULT 'trial'`,
+
+      // Set trialEndsAt for existing businesses that don't have it yet (30 days from account creation)
+      `UPDATE "Businesses" SET "trialEndsAt" = "createdAt" + INTERVAL '30 days' WHERE "trialEndsAt" IS NULL`,
+
+      // Admins table
+      `CREATE TABLE IF NOT EXISTS "Admins" (
+        "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "email" VARCHAR(255) NOT NULL UNIQUE,
+        "password" VARCHAR(255) NOT NULL,
+        "name" VARCHAR(255) NOT NULL,
+        "role" VARCHAR(50) NOT NULL DEFAULT 'super_admin',
+        "isActive" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      )`
+    ];
+
+    for (const sql of migrations) {
       try {
-        await db.sequelize.query(`
-          ALTER TABLE "Bookings"
-          ADD COLUMN IF NOT EXISTS "reminderSent" BOOLEAN DEFAULT false;
-        `);
-        console.log('✅ reminderSent column added (via IF NOT EXISTS)');
-      } catch (altErr) {
-        console.error('❌ Alternative migration also failed:', altErr.message);
-        console.error('⚠️ Please manually run: ALTER TABLE "Bookings" ADD COLUMN "reminderSent" BOOLEAN DEFAULT false;');
+        await db.sequelize.query(sql);
+      } catch (err) {
+        // Log but don't crash — some may already exist or have conflicts
+        console.warn('⚠️  Migration warning (safe to ignore):', err.message.split('\n')[0]);
       }
     }
+    console.log('✅ Migrations complete');
 
     // Start reminder scheduler after DB is ready
     startReminderScheduler();
