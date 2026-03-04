@@ -157,6 +157,7 @@ router.put('/booking-policy', authMiddleware, async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET BUSINESS BY SLUG (public)
+// ── Returns isPaused so the client page can show an "unavailable" screen ──
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/:slug', async (req, res) => {
   try {
@@ -174,6 +175,19 @@ router.get('/:slug', async (req, res) => {
     });
 
     if (!business) return res.status(404).json({ message: 'Business not found' });
+
+    // ── If paused, return minimal info + paused flag (no services/bookings exposed) ──
+    if (business.isPaused) {
+      return res.status(403).json({
+        isPaused: true,
+        pauseReason: business.pauseReason || null,
+        business: {
+          businessName: business.businessName,
+          logo: business.logo,
+          slug: business.slug
+        }
+      });
+    }
 
     res.json({ business });
   } catch (error) {

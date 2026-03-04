@@ -28,15 +28,121 @@ import BusinessSidebar from "./components/business/BusinessSidebar"
 import BusinessTopTabs from "./components/business/BusinessTopTabs"
 
 import { useBusinessMeta, useClientBusinessMeta } from "./hooks/useBusinessMeta"
+import { authAPI, businessAPI } from "./utils/api"
 
-// Unified Client Layout
+// Admin imports
+import AdminRoute from './pages/admin/AdminRoute';
+import AdminLogin from './components/admin/AdminLogin';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminDashboard from './components/admin/AdminDashboard';
+import BusinessesList from './components/admin/BusinessesList';
+import BusinessDetail from './components/admin/BusinessDetail';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAUSED SCREEN — shown to business owner when their account is paused
+// ─────────────────────────────────────────────────────────────────────────────
+function BusinessPausedScreen({ reason }: { reason?: string }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
+        <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Account Paused</h1>
+        <p className="text-gray-500 mb-4">
+          Your account has been temporarily paused by an administrator.
+        </p>
+        {reason && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-6 text-sm text-orange-800">
+            <strong>Reason:</strong> {reason}
+          </div>
+        )}
+        <p className="text-sm text-gray-400 mb-6">
+          Please contact support at <a href="mailto:support@fortly.xyz" className="text-emerald-600 underline">support@fortly.xyz</a> to resolve this.
+        </p>
+        <button
+          onClick={() => { localStorage.removeItem('token'); window.location.href = '/business/login'; }}
+          className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+        >
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAUSED SCREEN — shown to clients visiting a paused business's public page
+// ─────────────────────────────────────────────────────────────────────────────
+function ClientPausedScreen({ businessName, logo }: { businessName?: string; logo?: string }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
+        {logo ? (
+          <img src={logo} alt={businessName} className="w-16 h-16 rounded-full object-cover mx-auto mb-4" />
+        ) : (
+          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl font-bold text-gray-500">
+              {businessName?.charAt(0).toUpperCase() || '?'}
+            </span>
+          </div>
+        )}
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          {businessName || 'This Business'}
+        </h1>
+        <p className="text-gray-500 mb-2">is temporarily unavailable.</p>
+        <p className="text-sm text-gray-400">
+          Please check back later or contact the business directly.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED CLIENT LAYOUT — checks isPaused from the public API response
+// ─────────────────────────────────────────────────────────────────────────────
 function UnifiedClientLayout() {
   const location = useLocation()
   const { pathname } = location
   const { businessSlug } = useParams()
 
-  // ✅ Set tab title and favicon from public business data
+  const [pausedInfo, setPausedInfo] = useState<{ isPaused: boolean; businessName?: string; logo?: string } | null>(null)
+  const [checking, setChecking] = useState(true)
+
   useClientBusinessMeta(businessSlug)
+
+  useEffect(() => {
+    if (!businessSlug) { setChecking(false); return; }
+
+    businessAPI.getBySlug(businessSlug)
+      .then(() => { setPausedInfo(null); setChecking(false); })
+      .catch((err: any) => {
+        if (err.response?.status === 403 && err.response?.data?.isPaused) {
+          setPausedInfo({
+            isPaused: true,
+            businessName: err.response.data.business?.businessName,
+            logo: err.response.data.business?.logo
+          });
+        }
+        setChecking(false);
+      });
+  }, [businessSlug]);
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" />
+      </div>
+    );
+  }
+
+  // ── Client sees "unavailable" screen if business is paused ──
+  if (pausedInfo?.isPaused) {
+    return <ClientPausedScreen businessName={pausedInfo.businessName} logo={pausedInfo.logo} />;
+  }
 
   const isBookingFlow = pathname.includes('/booking')
   const isConfirmationFlow = pathname.includes('/confirmation')
@@ -69,9 +175,7 @@ function UnifiedClientLayout() {
       </footer>
 
       {!isConfirmationFlow && (
-        <AppointmentWidget
-          businessSlug={businessSlug || ""}
-        />
+        <AppointmentWidget businessSlug={businessSlug || ""} />
       )}
 
       <ChatWidget
@@ -82,14 +186,51 @@ function UnifiedClientLayout() {
   )
 }
 
-// Business pages wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+// BUSINESS PAGE LAYOUT — checks isPaused from /me on every load
+// ─────────────────────────────────────────────────────────────────────────────
 function BusinessPageLayout() {
-  // ✅ Set tab title and favicon from authenticated business data
   useBusinessMeta()
 
   const location = useLocation()
   const { pathname } = location
   const isCalendarPage = pathname.includes('/calendar')
+
+  const [pausedInfo, setPausedInfo] = useState<{ isPaused: boolean; reason?: string } | null>(null)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    authAPI.getMe()
+      .then((res: any) => {
+        const biz = res.data.business;
+        if (biz?.isPaused) {
+          setPausedInfo({ isPaused: true, reason: biz.pauseReason });
+        } else {
+          setPausedInfo(null);
+        }
+        setChecking(false);
+      })
+      .catch((err: any) => {
+        // 403 with isPaused means the middleware blocked it
+        if (err.response?.status === 403 && err.response?.data?.isPaused) {
+          setPausedInfo({ isPaused: true, reason: err.response.data.pauseReason });
+        }
+        setChecking(false);
+      });
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" />
+      </div>
+    );
+  }
+
+  // ── Business owner sees paused screen instead of dashboard ──
+  if (pausedInfo?.isPaused) {
+    return <BusinessPausedScreen reason={pausedInfo.reason} />;
+  }
 
   return (
     <BusinessLayout
@@ -103,8 +244,10 @@ function BusinessPageLayout() {
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// APP
+// ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
-  // Preload notification sound on app initialization
   useEffect(() => {
     preloadNotificationSound().catch(error => {
       console.warn('Failed to preload notification sound:', error);
@@ -114,7 +257,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Business Authentication Routes */}
+        {/* Business Auth */}
         <Route path="/business/login" element={<LoginPage />} />
         <Route path="/business/signup" element={<SignupPage />} />
         <Route path="/business/onboarding" element={<OnboardingPage />} />
@@ -122,7 +265,7 @@ export default function App() {
         <Route path="/business/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/business/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Business Dashboard Routes */}
+        {/* Business Dashboard */}
         <Route path="/business" element={<BusinessPageLayout />}>
           <Route index element={<Navigate to="gallery" replace />} />
           <Route path="gallery" element={<BusinessGallery />} />
@@ -140,10 +283,20 @@ export default function App() {
           <Route path="booking" element={<BookingPage />} />
         </Route>
 
-        {/* Confirmation Page */}
+        {/* Confirmation */}
         <Route path="/:businessSlug/confirmation" element={<ConfirmationPage />} />
 
-        {/* Default redirect */}
+        {/* Admin */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={<AdminRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="businesses" element={<BusinessesList />} />
+            <Route path="businesses/:id" element={<BusinessDetail />} />
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          </Route>
+        </Route>
+
         <Route path="/" element={<Navigate to="/business/login" replace />} />
       </Routes>
     </BrowserRouter>

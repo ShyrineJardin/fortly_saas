@@ -68,6 +68,38 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 1,
       comment: '1 = sequential (one at a time). 2+ = concurrent (e.g. salon with multiple staff)'
     },
+    subscriptionPlan: {
+      type: DataTypes.ENUM('free', 'monthly', 'yearly'),
+      defaultValue: 'free'
+    },
+    subscriptionStatus: {
+      type: DataTypes.ENUM('active', 'paused', 'cancelled', 'trial'),
+      defaultValue: 'trial'
+    },
+    trialEndsAt: {
+      type: DataTypes.DATE,
+      defaultValue: () => {
+        const date = new Date();
+        date.setDate(date.getDate() + 30); // 30 day trial
+        return date;
+      }
+    },
+    subscriptionStartDate: {
+      type: DataTypes.DATE
+    },
+    subscriptionEndDate: {
+      type: DataTypes.DATE
+    },
+    isPaused: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    pausedAt: {
+      type: DataTypes.DATE
+    },
+    pauseReason: {
+      type: DataTypes.STRING
+    },
 
     // Password Reset
     resetPasswordToken: { type: DataTypes.STRING, allowNull: true },

@@ -21,6 +21,7 @@ const reviewRoutes = require('./routes/reviews');
 const googleCalendarRoutes = require('./routes/googleCalendar');
 const googleAuthRoutes = require('./routes/google-auth');
 const { startReminderScheduler } = require('./services/reminderScheduler');
+const adminRoutes = require('./routes/admin');
 
 // Now we can use sequelize and DataTypes
 const ClientCalendarToken = require('./models/ClientCalendarToken')(sequelize, DataTypes);
@@ -113,6 +114,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/googleCalendar', googleCalendarRoutes);
 app.use('/api/auth', googleAuthRoutes);
+app.use('/api/admin', adminRoutes);
+
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -131,7 +134,7 @@ const PORT = process.env.PORT || 5000;
 db.sequelize.authenticate()
   .then(() => {
     console.log('✅ Database connected successfully');
-    return db.sequelize.sync({ alter: true });
+    return db.sequelize.sync({ alter: false });
   })
   .then(async () => {                          
     console.log('✅ Database synced');

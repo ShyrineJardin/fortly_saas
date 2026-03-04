@@ -31,6 +31,7 @@ db.Booking = require('../models/Booking')(sequelize, Sequelize);
 db.Message = require('../models/Message')(sequelize, Sequelize);
 db.Review = require('../models/Review')(sequelize, Sequelize);
 db.Schedule = require('../models/Schedule')(sequelize, Sequelize);
+db.Admin = require('../models/Admin')(sequelize, Sequelize); 
 
 // Define associations
 // Business has many Services
