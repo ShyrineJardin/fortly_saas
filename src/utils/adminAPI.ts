@@ -1,20 +1,15 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = (import.meta as any).env?.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const adminAPI = axios.create({
   baseURL: `${API_URL}/admin`,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  headers: { 'Content-Type': 'application/json' }
 });
 
-// Add token to requests
 adminAPI.interceptors.request.use((config) => {
   const token = localStorage.getItem('adminToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -35,7 +30,11 @@ export const adminAPIs = {
     adminAPI.put(`/businesses/${id}/pause`, { isPaused, reason }),
   deleteBusiness: (id: string) => adminAPI.delete(`/businesses/${id}`),
   extendTrial: (id: string, days: number) =>
-    adminAPI.put(`/businesses/${id}/extend-trial`, { days })
+    adminAPI.put(`/businesses/${id}/extend-trial`, { days }),
+
+  // ── Settings: change email and/or password ──
+  updateSettings: (data: { email?: string; currentPassword?: string; newPassword?: string }) =>
+    adminAPI.put('/settings', data)
 };
 
 export default adminAPIs;
