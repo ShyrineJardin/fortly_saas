@@ -237,8 +237,9 @@ router.put('/businesses/:id/extend-trial', adminAuth, async (req, res) => {
     const business = await db.Business.findByPk(req.params.id);
     if (!business) return res.status(404).json({ message: 'Business not found' });
 
-    const newTrialEnd = new Date(business.trialEndsAt || new Date());
-    newTrialEnd.setDate(newTrialEnd.getDate() + parseInt(days));
+    // Always extend from existing trialEndsAt, never from today
+    const baseDate = business.trialEndsAt ? new Date(business.trialEndsAt) : new Date();
+    const newTrialEnd = new Date(baseDate.getTime() + parseInt(days) * 24 * 60 * 60 * 1000);
     await business.update({ trialEndsAt: newTrialEnd });
 
     res.json({ message: `Trial extended by ${days} days`, business: await db.Business.findByPk(req.params.id, { attributes: { exclude: ['password'] } }) });
