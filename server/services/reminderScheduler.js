@@ -1,18 +1,19 @@
 const cron = require('node-cron');
 const { Op } = require('sequelize');
 const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 
 const db = require('../config/database');
 
 // ── Run every 5 minutes, check for appointments starting in ~1 hour ──
 const startReminderScheduler = () => {
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('*/30 * * * *', async () => {
     try {
       const now = new Date();
 
-      // Target window: appointments starting between 55 and 65 minutes from now
-      const windowStart = new Date(now.getTime() + 55 * 60 * 1000);
-      const windowEnd   = new Date(now.getTime() + 65 * 60 * 1000);
+      const windowStart = new Date(now.getTime() + 45 * 60 * 1000);
+      const windowEnd   = new Date(now.getTime() + 75 * 60 * 1000);
 
       const windowStartDate = windowStart.toISOString().split('T')[0]; // YYYY-MM-DD
       const windowEndDate   = windowEnd.toISOString().split('T')[0];
@@ -71,7 +72,6 @@ const startReminderScheduler = () => {
 
 // ── Send reminder to both client and business ──
 const sendReminderEmails = async (booking, business, service) => {
-  const resend = new Resend(process.env.RESEND_API_KEY);
   const FROM_EMAIL = 'Fortly <noreply@fortly.xyz>';
 
   const formatTime = (timeString) => {
