@@ -20,8 +20,8 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     role: {
-      type: DataTypes.ENUM('super_admin', 'moderator'),
-      defaultValue: 'moderator'
+      type: DataTypes.STRING(50),
+      defaultValue: 'super_admin'
     },
     isActive: {
       type: DataTypes.BOOLEAN,
@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     timestamps: true,
-    tableName: 'admins'
+    tableName: 'Admins'
   });
 
   return Admin;
