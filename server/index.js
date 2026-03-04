@@ -263,6 +263,13 @@ db.sequelize.authenticate()
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📧 Resend email configured`);
     });
+
+    // Memory monitor - log every 2 minutes
+    setInterval(() => {
+      const used = process.memoryUsage();
+      console.log(`📊 Memory: heap ${Math.round(used.heapUsed/1024/1024)}MB / ${Math.round(used.heapTotal/1024/1024)}MB | RSS ${Math.round(used.rss/1024/1024)}MB`);
+    }, 2 * 60 * 1000);
+
   })
   .catch(err => {
     console.error('❌ Database connection error:', err);
