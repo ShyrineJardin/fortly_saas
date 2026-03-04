@@ -180,7 +180,7 @@ export default function BusinessDetail() {
           <button onClick={openPauseModal} className={`px-4 py-2 ${business.isPaused ? 'bg-green-600' : 'bg-orange-600'} text-white rounded-lg hover:opacity-90`}>
             {business.isPaused ? 'Unpause Account' : 'Pause Account'}
           </button>
-          <button onClick={() => window.open(`https://fortly.xyz/${business.slug}`, '_blank')} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+          <button onClick={() => window.open(`https://app.fortly.xyz/${business.slug}`, '_blank')} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
             View Website
           </button>
           <button onClick={() => setShowDeleteModal(true)} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
