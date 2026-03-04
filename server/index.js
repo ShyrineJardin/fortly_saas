@@ -204,19 +204,16 @@ db.sequelize.authenticate()
       const bcrypt = require('bcryptjs');
       const plainPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Fortly2024';
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
-      await db.sequelize.query(`
-        UPDATE "Admins" SET 
-          "password" = :password,
-          "email" = :email,
-          "updatedAt" = NOW()
-        WHERE 1=1
-      `, {
-        replacements: {
-          password: hashedPassword,
-          email: process.env.ADMIN_EMAIL || 'admin@fortly.xyz'
-        },
-        type: db.Sequelize.QueryTypes.UPDATE
-      });
+      // Use raw query without QueryTypes to ensure update actually runs
+      await db.sequelize.query(
+        `UPDATE "Admins" SET "password" = '${hashedPassword}', "email" = '${process.env.ADMIN_EMAIL || 'admin@fortly.xyz'}', "updatedAt" = NOW()`
+      );
+      const [verify] = await db.sequelize.query(
+        `SELECT substring(password, 1, 10) as hash_start, email FROM "Admins" LIMIT 1`,
+        { type: db.Sequelize.QueryTypes.SELECT }
+      );
+      console.log('🔍 Verify stored hash starts with:', verify?.hash_start);
+      console.log('🔍 Verify stored email:', verify?.email);
       // Verify hash works immediately after creation
       const testMatch = await bcrypt.compare(plainPassword, hashedPassword);
       console.log('🔐 bcrypt self-test:', testMatch ? '✅ PASS' : '❌ FAIL - hash broken');
