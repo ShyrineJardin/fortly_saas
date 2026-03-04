@@ -178,11 +178,25 @@ db.sequelize.authenticate()
     for (const sql of migrations) {
       try {
         await db.sequelize.query(sql);
+        console.log('✅ Migration OK:', sql.slice(0, 60));
       } catch (err) {
-        // Log but don't crash — some may already exist or have conflicts
-        console.warn('⚠️  Migration warning (safe to ignore):', err.message.split('\n')[0]);
+        console.warn('⚠️  Migration FAILED:', err.message.split('\n')[0]);
+        console.warn('    SQL was:', sql.slice(0, 80));
       }
     }
+
+    // ── Verify columns actually exist after migration ──
+    try {
+      const [cols] = await db.sequelize.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'Businesses'
+        AND column_name IN ('subscriptionPlan','subscriptionStatus','isPaused','trialEndsAt')
+      `);
+      console.log('✅ Verified columns:', cols.map(c => c.column_name).join(', ') || 'NONE FOUND ❌');
+    } catch (e) {
+      console.warn('⚠️  Column check failed:', e.message);
+    }
+
     console.log('✅ Migrations complete');
 
     // ── Auto-create default admin if none exists ──
