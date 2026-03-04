@@ -10,6 +10,17 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log('🔑 Login attempt - email:', email);
+    console.log('🔑 Login attempt - password length:', password?.length);
+    const allAdmins = await db.sequelize.query(
+      `SELECT email, substring(password, 1, 7) as hash_prefix, "isActive" FROM "Admins"`,
+      { type: db.Sequelize.QueryTypes.SELECT }
+    );
+    console.log('📋 DB admins:', JSON.stringify(allAdmins));
+    const testHash = await bcrypt.hash(password, 10);
+    const directTest = await bcrypt.compare(password, allAdmins[0]?.hash_prefix);
+    console.log('🔐 Direct compare test:', directTest);
+
     const admin = await db.Admin.findOne({ where: { email } });
     
     if (!admin) {
