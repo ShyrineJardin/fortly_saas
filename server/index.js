@@ -22,6 +22,7 @@ const googleCalendarRoutes = require('./routes/googleCalendar');
 const googleAuthRoutes = require('./routes/google-auth');
 const { startReminderScheduler } = require('./services/reminderScheduler');
 const adminRoutes = require('./routes/admin');
+const lemonsqueezyRoutes = require('./routes/lemonsqueezy');
 
 // Now we can use sequelize and DataTypes
 const ClientCalendarToken = require('./models/ClientCalendarToken')(sequelize, DataTypes);
@@ -55,6 +56,8 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
+// ── Lemon Squeezy webhook needs raw body — must be before express.json ──
+app.use('/api/lemonsqueezy/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb', parameterLimit: 50000 }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -115,6 +118,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/googleCalendar', googleCalendarRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/lemonsqueezy', lemonsqueezyRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -190,13 +194,13 @@ db.sequelize.authenticate()
       const count = parseInt(adminCount[0].count);
       if (count === 0) {
         const bcrypt = require('bcryptjs');
-        const hashedPassword = await bcrypt.hash(process.env.ADMIN_DEFAULT_PASSWORD, 10);
+        const hashedPassword = await bcrypt.hash(process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@Fortly2024!', 10);
         await db.sequelize.query(`
           INSERT INTO "Admins" ("id", "email", "password", "name", "role", "isActive", "createdAt", "updatedAt")
           VALUES (gen_random_uuid(), :email, :password, 'Super Admin', 'super_admin', true, NOW(), NOW())
         `, {
           replacements: {
-            email: process.env.ADMIN_EMAIL,
+            email: process.env.ADMIN_EMAIL || 'admin@fortly.xyz',
             password: hashedPassword
           },
           type: db.Sequelize.QueryTypes.INSERT
