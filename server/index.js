@@ -199,6 +199,29 @@ db.sequelize.authenticate()
 
     console.log('✅ Migrations complete');
 
+    // ── Force reset admin password on every deploy (remove after confirmed working) ──
+    try {
+      const bcrypt = require('bcryptjs');
+      const hashedPassword = await bcrypt.hash(process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@Fortly2024!', 10);
+      await db.sequelize.query(`
+        UPDATE "Admins" SET 
+          "password" = :password,
+          "email" = :email,
+          "updatedAt" = NOW()
+        WHERE 1=1
+      `, {
+        replacements: {
+          password: hashedPassword,
+          email: process.env.ADMIN_EMAIL || 'admin@fortly.xyz'
+        },
+        type: db.Sequelize.QueryTypes.UPDATE
+      });
+      console.log('✅ Admin password reset to default');
+      console.log('📧 Admin email:', process.env.ADMIN_EMAIL || 'admin@fortly.xyz');
+    } catch (err) {
+      console.warn('⚠️  Admin reset warning:', err.message);
+    }
+
     // ── Auto-create default admin if none exists ──
     try {
       const adminCount = await db.sequelize.query(
