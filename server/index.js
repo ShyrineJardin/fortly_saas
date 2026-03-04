@@ -34,34 +34,9 @@ const server = http.createServer(app);
 db.ClientCalendarToken = ClientCalendarToken;
 
 // Configure Socket.IO
-// ── Allow multiple frontend origins ──
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:3000',
-  process.env.LANDING_URL  || 'http://localhost:5173',
-  'https://app.fortly.xyz',
-  'https://fortly.xyz',
-  'https://www.fortly.xyz',
-  'https://dev.fortly.xyz',
-  'http://localhost:3000',
-  'http://localhost:5173'
-];
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    console.warn('CORS blocked:', origin);
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-
 const io = socketIo(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -77,7 +52,10 @@ if (db.Business) {
 app.set('io', io);
 
 // Middleware
-app.use(cors(corsOptions));
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
 // ── Lemon Squeezy webhook needs raw body — must be before express.json ──
 app.use('/api/lemonsqueezy/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '50mb' }));
