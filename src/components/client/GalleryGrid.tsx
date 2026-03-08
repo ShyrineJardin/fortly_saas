@@ -3,6 +3,7 @@ import { IoClose, IoChevronBack, IoChevronForward } from 'react-icons/io5'
 import { MdVideocam } from 'react-icons/md'
 import { galleryAPI } from '../../utils/api'
 import { useParams } from 'react-router-dom'
+import { getCached, setCached } from '../../utils/apiCache'
 
 interface GalleryItem {
   id: string;
@@ -24,10 +25,22 @@ export default function GalleryGrid() {
   }, [businessSlug]);
 
   const fetchGallery = async () => {
+    const cacheKey = `gallery-client-${businessSlug}`;
+
+    // Return cached data instantly — no loading flash
+    const cached = getCached<GalleryItem[]>(cacheKey);
+    if (cached) {
+      setMedia(cached);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await galleryAPI.getByBusinessSlug(businessSlug || '');
-      setMedia(response.data.gallery);
+      const data = response.data.gallery;
+      setCached(cacheKey, data);
+      setMedia(data);
     } catch (error) {
       console.error('Error fetching gallery:', error);
     } finally {
@@ -65,7 +78,6 @@ export default function GalleryGrid() {
 
   return (
     <div className="relative">
-      {/* Grid View */}
       <div className="columns-2 sm:columns-3 md:columns-4 gap-2 space-y-2">
         {media.map((item, i) => (
           <div 
@@ -74,23 +86,10 @@ export default function GalleryGrid() {
             className="bg-gray-200 rounded-xl overflow-hidden break-inside-avoid cursor-pointer hover:opacity-90 transition-all group relative"
           >
             {item.mediaType === 'video' ? (
-              <video 
-                src={item.mediaUrl}
-                className="w-full h-auto object-cover" 
-                muted 
-                autoPlay 
-                loop 
-                playsInline
-              />
+              <video src={item.mediaUrl} className="w-full h-auto object-cover" muted autoPlay loop playsInline />
             ) : (
-              <img 
-                src={item.mediaUrl}
-                alt={item.caption || "Gallery post"} 
-                className="w-full h-auto object-cover" 
-              />
+              <img src={item.mediaUrl} alt={item.caption || "Gallery post"} className="w-full h-auto object-cover" />
             )}
-
-            {/* Video indicator */}
             {item.mediaType === 'video' && (
               <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded">
                 {MdVideocam({size: 20})} 
@@ -100,54 +99,22 @@ export default function GalleryGrid() {
         ))}
       </div>
 
-      {/* Lightbox Modal */}
       {selectedMedia && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4"
-          onClick={() => setSelectedIndex(null)}
-        >
-          <button 
-            className="absolute top-4 right-4 text-white text-3xl z-50 hover:scale-110 transition-transform"
-            onClick={() => setSelectedIndex(null)}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4" onClick={() => setSelectedIndex(null)}>
+          <button className="absolute top-4 right-4 text-white text-3xl z-50 hover:scale-110 transition-transform" onClick={() => setSelectedIndex(null)}>
             {IoClose({})}
           </button>
-
-          <button 
-            onClick={handlePrev}
-            className="absolute left-2 md:left-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
-          >
+          <button onClick={handlePrev} className="absolute left-2 md:left-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50">
             {IoChevronBack({})}
           </button>
-
-          <div 
-            className="relative w-full max-w-lg md:max-w-2xl lg:max-w-3xl flex flex-col items-center"
-            onClick={(e) => e.stopPropagation()} 
-          >
+          <div className="relative w-full max-w-lg md:max-w-2xl lg:max-w-3xl flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             {selectedMedia.mediaType === 'video' ? (
-              <video 
-                ref={videoRef}
-                key={selectedMedia.mediaUrl} 
-                src={selectedMedia.mediaUrl}
-                controls 
-                autoPlay 
-                loop
-                playsInline
-                className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black"
-              />
+              <video ref={videoRef} key={selectedMedia.mediaUrl} src={selectedMedia.mediaUrl} controls autoPlay loop playsInline className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black" />
             ) : (
-              <img 
-                src={selectedMedia.mediaUrl}
-                className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black"
-                alt="Large view"
-              />
+              <img src={selectedMedia.mediaUrl} className="w-full h-auto max-h-[80vh] rounded-lg shadow-2xl object-contain bg-black" alt="Large view" />
             )}
           </div>
-
-          <button 
-            onClick={handleNext}
-            className="absolute right-2 md:right-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50"
-          >
+          <button onClick={handleNext} className="absolute right-2 md:right-8 text-white text-3xl bg-white/10 backdrop-blur-md p-3 rounded-full hover:bg-white/20 transition-all z-50">
             {IoChevronForward({})}
           </button>
         </div>

@@ -264,6 +264,16 @@ db.sequelize.authenticate()
       console.log(`📧 Resend email configured`);
     });
 
+    // Keep Neon database alive - ping every 4 minutes
+    setInterval(async () => {
+      try {
+        await db.sequelize.query('SELECT 1');
+        console.log('🟢 DB keepalive ping');
+      } catch (err) {
+        console.error('❌ DB keepalive failed:', err.message);
+      }
+    }, 4 * 60 * 1000); // every 4 minutes
+
     // Memory monitor - log every 2 minutes
     setInterval(() => {
       const used = process.memoryUsage();
