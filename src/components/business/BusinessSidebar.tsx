@@ -222,7 +222,7 @@ export default function BusinessSidebar() {
       invalidateCache('auth-me')
       await businessAPI.updateProfile(data)
       invalidateCache('auth-me')
-      await fetchBusinessData()
+      await fetchBusinessData()  // updates both savedData and formData
       setIsEditing(false)
     } catch (err: any) {
       console.error('Update error:', err)
@@ -374,14 +374,14 @@ export default function BusinessSidebar() {
                 <span className='text-sm font-medium'>{item.day}</span>
               </div>
               {item.enabled && (
-                <div className='flex items-center gap-2 ml-6'>
+                <div className='flex items-center gap-1 ml-6'>
                   <input type="time" value={item.startTime}
                     onChange={(e) => handleTimeChange(index, 'startTime', e.target.value)}
-                    className='flex-1 px-2 py-1 border border-gray-300 rounded text-sm' />
-                  <span className='text-xs text-gray-500'>to</span>
+                    className='w-[120px] px-1 py-1 border border-gray-300 rounded text-xs' />
+                  <span className='text-xs text-gray-400'>–</span>
                   <input type="time" value={item.endTime}
                     onChange={(e) => handleTimeChange(index, 'endTime', e.target.value)}
-                    className='flex-1 px-2 py-1 border border-gray-300 rounded text-sm' />
+                    className='w-[120px] px-1 py-1 border border-gray-300 rounded text-xs' />
                 </div>
               )}
             </div>
@@ -467,7 +467,7 @@ export default function BusinessSidebar() {
         <div className='lg:hidden fixed inset-0 bg-white z-[9999] overflow-y-auto'>
           <div className='bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10'>
             <div className='flex items-center justify-between'>
-              <button onClick={() => { setShowMobileInfo(false); if (isEditing) handleCancel() }} className='p-2 -ml-2'>
+              <button onClick={() => { setIsEditing(false); setFormData(savedData); setShowMobileInfo(false) }} className='p-2 -ml-2'>
                 {FaChevronRight({ size: 20, className: "rotate-180" })}
               </button>
               <span className='text-base font-semibold'>{isEditing ? 'Edit Profile' : 'Business Profile'}</span>
