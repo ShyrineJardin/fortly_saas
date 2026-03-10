@@ -375,13 +375,19 @@ export default function BusinessSidebar() {
               </div>
               {item.enabled && (
                 <div className='flex items-center gap-1 ml-6'>
-                  <input type="time" value={item.startTime}
+                  <input
+                    type="time"
+                    value={item.startTime}
                     onChange={(e) => handleTimeChange(index, 'startTime', e.target.value)}
-                    className='w-[120px] px-1 py-1 border border-gray-300 rounded text-xs' />
-                  <span className='text-xs text-gray-400'>–</span>
-                  <input type="time" value={item.endTime}
+                    className='w-[105px] px-1 py-1 border border-gray-300 rounded text-xs'
+                  />
+                  <span className='text-xs text-gray-500'>-</span>
+                  <input
+                    type="time"
+                    value={item.endTime}
                     onChange={(e) => handleTimeChange(index, 'endTime', e.target.value)}
-                    className='w-[120px] px-1 py-1 border border-gray-300 rounded text-xs' />
+                    className='w-[105px] px-1 py-1 border border-gray-300 rounded text-xs'
+                  />
                 </div>
               )}
             </div>
