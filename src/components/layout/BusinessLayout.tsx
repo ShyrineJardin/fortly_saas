@@ -16,27 +16,19 @@ export default function BusinessLayout({ sidebar, children, footer, showHeader, 
 
   useEffect(() => {
     const slug = localStorage.getItem('businessSlug')
-    console.log('🔍 BusinessSlug from localStorage:', slug)
-    if (slug) {
-      setBusinessSlug(slug)
-    }
+    if (slug) setBusinessSlug(slug)
   }, [])
   
   return (
     <div className='flex flex-col min-h-screen'>
       {showHeader && <HeaderLogo />}
-      
-      {sidebar && (
-        <div className='lg:hidden'>
-          {sidebar}
-        </div>
-      )}
-
       {showBusinessHeader && <BusinessHeader />}
-      
+
+      {sidebar && <div className='lg:hidden'>{sidebar}</div>}
+
       <div className='flex flex-1'>
         {sidebar && (
-          <aside className='hidden lg:block w-80 p-6 overflow-y-auto'>
+          <aside className='hidden lg:flex w-80 p-6 overflow-y-auto'>
             {sidebar}
           </aside>
         )}
@@ -45,12 +37,6 @@ export default function BusinessLayout({ sidebar, children, footer, showHeader, 
           {children}
         </main>
       </div>
-
-      {sidebar && (
-        <div className='lg:hidden'>
-          {sidebar}
-        </div>
-      )}
       
       {footer && (
         <footer className='bg-footerBackground mt-auto'>
