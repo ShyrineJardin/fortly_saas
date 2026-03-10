@@ -728,7 +728,7 @@ export default function BusinessService() {
                   ) : (
                     <div className="text-center py-8">
                       {MdImage({ size: 48, className: "text-gray-400 mx-auto mb-2" })}
-                      <p className="text-sm text-gray-500">Click to upload image</p>
+                      <p className="text-sm text-gray-500">Click to upload image (jpg, png)</p>
                     </div>
                   )}
                 </div>
@@ -763,24 +763,24 @@ export default function BusinessService() {
                 <input type="text" value={serviceForm.name} onChange={(e) => setServiceForm(prev => ({ ...prev, name: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Duration */}
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     {serviceForm.serviceType === 'preparation' ? 'Preparation Time' : serviceForm.serviceType === 'occupancy' ? 'Occupancy Duration' : 'Duration'}
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 overflow-x-auto">
                     <input
                       type="number" min="1" step="0.5"
                       value={serviceForm.durationValue || ''}
                       onChange={(e) => setServiceForm(prev => ({ ...prev, durationValue: e.target.value, duration: `${e.target.value} ${prev.durationUnit || 'minutes'}` }))}
                       placeholder="60"
-                      className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="min-w-[72px] w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm flex-shrink-0"
                     />
                     <select
                       value={serviceForm.durationUnit || 'minutes'}
                       onChange={(e) => setServiceForm(prev => ({ ...prev, durationUnit: e.target.value, duration: `${prev.durationValue || ''} ${e.target.value}` }))}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="min-w-[100px] flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     >
                       <option value="minutes">Minutes</option>
                       <option value="hours">Hours</option>
@@ -798,8 +798,8 @@ export default function BusinessService() {
                 {/* Price */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Price</label>
-                  <div className="flex gap-2">
-                    <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-24">
+                  <div className="flex gap-2 overflow-x-auto">
+                    <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="min-w-[72px] w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm flex-shrink-0">
                       {['PHP', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD'].map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <input
@@ -807,7 +807,7 @@ export default function BusinessService() {
                       value={serviceForm.price.replace(/^[A-Z]{3}\s/, '')}
                       onChange={(e) => setServiceForm(prev => ({ ...prev, price: `${currency} ${e.target.value.replace(/[^0-9.,\s-]/g, '')}` }))}
                       placeholder="1,500"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                      className="min-w-[100px] flex-1 px-3 py-2 border border-gray-300 rounded-lg"
                     />
                   </div>
                 </div>
