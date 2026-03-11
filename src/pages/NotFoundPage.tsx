@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 export default function NotFoundPage() {
   const navigate = useNavigate()
@@ -20,11 +21,12 @@ export default function NotFoundPage() {
       >
         {/* Animated circle */}
         <div className="relative flex items-center justify-center mx-auto mb-8 w-52 h-52 md:w-80 md:h-80">
-          <img
-            src="/404-planet-animation.gif"
-            alt="Planet animation"
-            className="w-full h-full object-contain"
-          />
+          <DotLottieReact
+              src="https://lottie.host/f008373a-8c1d-4c53-915a-92d6b5a73330/f0GJ2ujwvn.lottie"
+              loop
+              autoplay
+              className="w-full h-full"
+            />
         </div>
 
         {/* Text */}

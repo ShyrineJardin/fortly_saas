@@ -233,59 +233,64 @@ export default function ChatWidget({
 
   // ── Socket.IO — force websocket transport, guaranteed room join ──
   useEffect(() => {
-    const socketUrl = apiBaseUrl.replace('/api', '');
+  console.log('🔗 Original apiBaseUrl:', apiBaseUrl);
+  console.log('🔗 process.env.REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
   
-    const socket = io(socketUrl, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 10,
-      autoConnect: true,  // ✅ Auto-connect
-      timeout: 20000
-    });
+  let socketUrl = apiBaseUrl.replace('/api', '');
   
-    socketRef.current = socket;
+  // ✅ Ensure socketUrl is valid
+  if (!socketUrl.startsWith('http://') && !socketUrl.startsWith('https://')) {
+    console.error('❌ Invalid socketUrl:', socketUrl);
+    socketUrl = 'https://api-dev.fortly.xyz'; // Fallback
+  }
   
-    // ✅ Define joinRoom function
-    const joinRoom = () => {
-      const email = userEmailRef.current;
-      if (email && businessSlugRef.current) {
-        console.log('📤 ChatWidget joining room:', businessSlugRef.current, email);
-        socket.emit('join-client', { 
-          businessSlug: businessSlugRef.current, 
-          clientEmail: email 
-        });
-      } else {
-        console.log('⏳ Waiting for email before joining room');
-      }
-    };
-  
+  console.log('🔗 Socket connecting to:', socketUrl);
+
+  const socket = io(socketUrl, {
+    transports: ['websocket'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 10,
+    autoConnect: true,
+    timeout: 20000
+  });
+
+  socketRef.current = socket;
+
+  // ✅ Define joinRoom function
+  const joinRoom = () => {
+    if (businessSlugRef.current) {
+      console.log('📤 BusinessChat joining room:', businessSlugRef.current);
+      socket.emit('join-business', businessSlugRef.current);
+    }
+  };
+
     // ✅ Join room on connect
     socket.on('connect', () => {
       console.log('✅ ChatWidget socket connected:', socket.id);
       joinRoom();
     });
-  
+
     // ✅ If already connected when this runs
     if (socket.connected) {
       console.log('✅ Socket already connected, joining room');
       joinRoom();
     }
-  
+
     socket.on('connect_error', (err) => {
       console.error('❌ Socket connect error:', err.message);
     });
-  
+
     socket.on('disconnect', (reason) => {
       console.log('🔌 Socket disconnected:', reason);
     });
-  
+
     socket.on('new-message', async (data) => {
       console.log('🔔 New message received by client:', data);
-      
+
       await playNotificationSound();
-    
+
       const currentEmail = userEmailRef.current;
       if (currentEmail) {
         try {
@@ -294,7 +299,7 @@ export default function ChatWidget({
           console.error('❌ Failed to reload messages:', error);
         }
       }
-    
+
       if (document.hidden && Notification.permission === 'granted') {
         new Notification(`New message from ${data.businessName}`, {
           body: data.message?.message || 'New message received',
@@ -302,17 +307,17 @@ export default function ChatWidget({
         });
       }
     });
-  
+
     socket.on('typing', (data) => {
       if (data.sender === 'business') {
         setIsBusinessTyping(data.isTyping);
       }
     });
-  
+
     if (Notification.permission === 'default') {
       Notification.requestPermission();
     }
-  
+
     return () => {
       console.log('🧹 Cleaning up socket connection');
       socket.off('connect');
@@ -323,13 +328,13 @@ export default function ChatWidget({
       socket.disconnect();
     };
   }, [businessSlug, apiBaseUrl]);
-  
+
   // ✅ Re-join room when email becomes available
   useEffect(() => {
     if (!userEmail || !socketRef.current) return;
-    
+
     const socket = socketRef.current;
-    
+
     if (socket.connected) {
       console.log('📤 Re-joining room with email:', userEmail, 'slug:', businessSlug);
       socket.emit('join-client', { 

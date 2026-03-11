@@ -92,20 +92,32 @@ export default function BusinessChat({
 
   // ── Socket.IO — force websocket transport, guaranteed room join ──
   useEffect(() => {
-    const socketUrl = apiBaseUrl.replace('/api', '');
-
+    // ✅ DEBUG: Log what we're working with
+    console.log('🔗 Original apiBaseUrl:', apiBaseUrl);
+    console.log('🔗 process.env.REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+    
+    let socketUrl = apiBaseUrl.replace('/api', '');
+    
+    // ✅ Ensure socketUrl is valid
+    if (!socketUrl.startsWith('http://') && !socketUrl.startsWith('https://')) {
+      console.error('❌ Invalid socketUrl:', socketUrl);
+      socketUrl = 'https://api-dev.fortly.xyz'; // Fallback
+    }
+    
+    console.log('🔗 Socket connecting to:', socketUrl);
+  
     const socket = io(socketUrl, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 10,
-      autoConnect: true,  // ✅ Auto-connect
+      autoConnect: true,
       timeout: 20000
     });
-
+  
     socketRef.current = socket;
-
+  
     // ✅ Define joinRoom function
     const joinRoom = () => {
       if (businessSlugRef.current) {
