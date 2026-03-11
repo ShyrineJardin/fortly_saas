@@ -6,6 +6,7 @@ import ReviewsPage from "./pages/client/ReviewsPage"
 import BookingPage from "./pages/client/BookingPage"
 import ConfirmationPage from "./pages/client/ConfirmationPage"
 import { preloadNotificationSound } from "./utils/notificationSound"
+import NotFoundPage from './pages/NotFoundPage'
 
 import LoginPage from './pages/business/LoginPage'
 import SignupPage from './pages/business/SignupPage'
@@ -126,6 +127,9 @@ function UnifiedClientLayout() {
             businessName: err.response.data.business?.businessName,
             logo: err.response.data.business?.logo
           });
+        } else if (err.response?.status === 404) {
+          // redirect to 404
+          window.location.replace('/404');
         }
         setChecking(false);
       });
@@ -298,6 +302,7 @@ export default function App() {
         </Route>
 
         <Route path="/" element={<Navigate to="/business/login" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   )

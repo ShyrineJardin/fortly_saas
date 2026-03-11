@@ -22,13 +22,11 @@ interface Message {
   createdAt?: string;
 }
 
-// ── Helper: save to localStorage AND notify sibling widgets on the same tab ──
 const setLocalStorageWithEvent = (key: string, value: string) => {
   localStorage.setItem(key, value);
   window.dispatchEvent(new CustomEvent('localStorageUpdate', { detail: { key, value } }));
 };
 
-// ── These form components are defined OUTSIDE so they never remount on re-render ──
 const WelcomeForm = ({
   userName, setUserName, userEmail, setUserEmail,
   onSubmit, onSwitchToReturning, isLoading, emailPrefilled
@@ -50,20 +48,16 @@ const WelcomeForm = ({
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">What's your name?</label>
-        <input
-          type="text" value={userName} onChange={(e) => setUserName(e.target.value)}
+        <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)}
           placeholder="Enter your name" required
-          className="text-sm w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen"
-        />
+          className="text-sm w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen" />
       </div>
       {!emailPrefilled ? (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">And your email?</label>
-          <input
-            type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)}
+          <input type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)}
             placeholder="your@email.com" required
-            className="text-sm w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen"
-          />
+            className="text-sm w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen" />
         </div>
       ) : (
         <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-center gap-2">
@@ -107,11 +101,9 @@ const ReturningUserForm = ({
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Your email</label>
-        <input
-          type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)}
+        <input type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)}
           placeholder="your@email.com" required
-          className="text-sm w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen"
-        />
+          className="text-sm w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primaryGreen" />
         {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
       </div>
       <button type="submit" disabled={isLoading} className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
@@ -125,7 +117,6 @@ const ReturningUserForm = ({
   </div>
 );
 
-// ── TypingIndicator outside to avoid remount ──
 const TypingIndicator = () => (
   <div className="flex items-start mb-3">
     <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2">
@@ -159,20 +150,30 @@ export default function ChatWidget({
   const [businessLogo, setBusinessLogo] = useState("");
   const [zoomedMedia, setZoomedMedia] = useState<{ type: 'image' | 'video', src: string } | null>(null);
   const [clickedMessageId, setClickedMessageId] = useState<string | number | null>(null);
+  const [isSubmittingWelcome, setIsSubmittingWelcome] = useState(false);
+  const [isBusinessTyping, setIsBusinessTyping] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const mobileMessageContainerRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
-  const [isSubmittingWelcome, setIsSubmittingWelcome] = useState(false);
-  const [isBusinessTyping, setIsBusinessTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ── Refs to avoid stale closures in socket handlers ──
+  const userEmailRef = useRef<string>("");
+  const userNameRef = useRef<string>("");
+
+  // Keep refs in sync with state
+  useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
+  useEffect(() => { userNameRef.current = userName; }, [userName]);
 
   const scrollToBottom = () => {
     if (messageContainerRef.current) messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
     if (mobileMessageContainerRef.current) mobileMessageContainerRef.current.scrollTop = mobileMessageContainerRef.current.scrollHeight;
   };
 
+  // ── Init: load stored credentials ──
   useEffect(() => {
     const storedName  = localStorage.getItem(`chat_${businessSlug}_name`);
     const storedEmail = localStorage.getItem(`chat_${businessSlug}_email`);
@@ -202,13 +203,14 @@ export default function ChatWidget({
     if (isOpen && messages.length > 0) setTimeout(scrollToBottom, 100);
   }, [isOpen]);
 
+  // ── Event listeners ──
   useEffect(() => {
     const handleOpenChat = () => setIsOpen(true);
     window.addEventListener('openChat', handleOpenChat);
 
     const handleLocalStorageUpdate = (e: CustomEvent) => {
       const relevantKeys = [`appointment_${businessSlug}_email`, `booking_${businessSlug}_email`];
-      if (relevantKeys.includes(e.detail.key) && !userEmail) {
+      if (relevantKeys.includes(e.detail.key) && !userEmailRef.current) {
         const newEmail =
           localStorage.getItem(`appointment_${businessSlug}_email`) ||
           localStorage.getItem(`booking_${businessSlug}_email`) || "";
@@ -226,50 +228,54 @@ export default function ChatWidget({
       window.removeEventListener('openChat', handleOpenChat);
       window.removeEventListener('localStorageUpdate', handleLocalStorageUpdate as EventListener);
     };
-  }, [businessSlug, userEmail]);
+  }, [businessSlug]);
 
+  // ── Socket.IO — set up ONCE, use refs to avoid stale closures ──
   useEffect(() => {
-    if (userEmail && businessSlug) {
-      const socketUrl = apiBaseUrl.replace('/api', '');
-      socketRef.current = io(socketUrl, {
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5
-      });
-      
-      socketRef.current.on('connect', () => {
-        console.log('✅ Socket connected, joining room');
-        socketRef.current?.emit('join-client', { businessSlug, clientEmail: userEmail });
-      });
-      
-      socketRef.current.on('new-message', async (data) => {
-        console.log('🔔 New message received by client:', data);
-        await playNotificationSound();
-        
-        // Reload messages immediately
+    const socketUrl = apiBaseUrl.replace('/api', '');
+    socketRef.current = io(socketUrl, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5
+    });
+
+    socketRef.current.on('connect', () => {
+      console.log('✅ Socket connected');
+      const email = userEmailRef.current;
+      if (email) {
+        socketRef.current?.emit('join-client', { businessSlug, clientEmail: email });
+      }
+    });
+
+    socketRef.current.on('new-message', async (data) => {
+      console.log('🔔 New message received by client:', data);
+      await playNotificationSound();
+
+      // Use ref — always has latest email without recreating socket
+      const currentEmail = userEmailRef.current;
+      if (currentEmail) {
         try {
-          await loadMessages(userEmail, true);
-          console.log('✅ Messages reloaded after new message');
+          await loadMessages(currentEmail, true);
         } catch (error) {
           console.error('❌ Failed to reload messages:', error);
         }
-        
-        // Show browser notification
-        if (document.hidden && Notification.permission === 'granted') {
-          new Notification(`New message from ${data.businessName}`, {
-            body: data.message?.message || 'New message received', 
-            icon: '/logo192.png',
-          });
-        }
-      });
-      
-      socketRef.current.on('typing', (data) => {
-        if (data.sender === 'business') setIsBusinessTyping(data.isTyping);
-      });
-      
-      if (Notification.permission === 'default') Notification.requestPermission();
-    }
+      }
+
+      if (document.hidden && Notification.permission === 'granted') {
+        new Notification(`New message from ${data.businessName}`, {
+          body: data.message?.message || 'New message received',
+          icon: '/logo192.png',
+        });
+      }
+    });
+
+    socketRef.current.on('typing', (data) => {
+      if (data.sender === 'business') setIsBusinessTyping(data.isTyping);
+    });
+
+    if (Notification.permission === 'default') Notification.requestPermission();
+
     return () => {
       if (socketRef.current) {
         socketRef.current.off('connect');
@@ -278,7 +284,14 @@ export default function ChatWidget({
         socketRef.current.disconnect();
       }
     };
-  }, [userEmail, businessSlug, apiBaseUrl]);
+  }, [businessSlug, apiBaseUrl]); // ← no userEmail dep — use ref instead
+
+  // ── Re-join socket room when email becomes available ──
+  useEffect(() => {
+    if (userEmail && socketRef.current?.connected) {
+      socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
+    }
+  }, [userEmail, businessSlug]);
 
   const fetchBusinessDetails = async () => {
     try {
@@ -292,11 +305,13 @@ export default function ChatWidget({
   };
 
   const handleTyping = () => {
-    if (socketRef.current && userEmail) {
-      socketRef.current.emit('typing', { sender: 'client', businessSlug, clientEmail: userEmail, clientName: userName, isTyping: true });
+    const email = userEmailRef.current;
+    const name = userNameRef.current;
+    if (socketRef.current && email) {
+      socketRef.current.emit('typing', { sender: 'client', businessSlug, clientEmail: email, clientName: name, isTyping: true });
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        socketRef.current?.emit('typing', { sender: 'client', businessSlug, clientEmail: userEmail, clientName: userName, isTyping: false });
+        socketRef.current?.emit('typing', { sender: 'client', businessSlug, clientEmail: email, clientName: name, isTyping: false });
       }, 1500);
     }
   };
@@ -311,7 +326,7 @@ export default function ChatWidget({
         type: msg.messageType || null, content: msg.fileContent, fileName: msg.fileName, createdAt: msg.createdAt
       }));
       setMessages(formattedMessages);
-      if (!userName && formattedMessages.length > 0) {
+      if (!userNameRef.current && formattedMessages.length > 0) {
         const clientMsg = response.data.messages.find((m: any) => m.sender === 'client');
         if (clientMsg?.clientName) {
           setUserName(clientMsg.clientName);
@@ -339,6 +354,10 @@ export default function ChatWidget({
     if (!localStorage.getItem(`appointment_${businessSlug}_email`)) {
       setLocalStorageWithEvent(`appointment_${businessSlug}_email`, userEmail);
     }
+    // Join socket room now that we have email
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
+    }
     setShowWelcomeForm(false);
     try {
       await axios.post(`${apiBaseUrl}/chat/send-client`, {
@@ -365,6 +384,10 @@ export default function ChatWidget({
           setUserEmail(returningEmail);
           setShowReturningForm(false);
           setShowWelcomeForm(false);
+          // Join socket room
+          if (socketRef.current?.connected) {
+            socketRef.current.emit('join-client', { businessSlug, clientEmail: returningEmail });
+          }
           await loadMessages(returningEmail);
         } else {
           setReturningError("No conversation found with this email. Please start a new chat.");
@@ -379,7 +402,8 @@ export default function ChatWidget({
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && userEmail) {
+    const email = userEmailRef.current;
+    if (file && email) {
       const fileType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : null;
       if (fileType) {
         const reader = new FileReader();
@@ -394,8 +418,8 @@ export default function ChatWidget({
             }]);
             setTimeout(scrollToBottom, 50);
             try {
-              await axios.post(`${apiBaseUrl}/chat/send-client`, { businessSlug, clientEmail: userEmail, clientName: userName, message: file.name, messageType: fileType, fileContent: result });
-              await loadMessages(userEmail, true);
+              await axios.post(`${apiBaseUrl}/chat/send-client`, { businessSlug, clientEmail: email, clientName: userNameRef.current, message: file.name, messageType: fileType, fileContent: result });
+              await loadMessages(email, true);
             } catch { setMessages(prev => prev.filter(msg => msg.id !== tempId)); }
           }
         };
@@ -406,7 +430,8 @@ export default function ChatWidget({
   };
 
   const handleSendMessage = async () => {
-    if (message.trim() && userEmail) {
+    const email = userEmailRef.current;
+    if (message.trim() && email) {
       const messageText = message.trim();
       const tempId = `temp-${Date.now()}`;
       setMessages(prev => [...prev, {
@@ -417,8 +442,8 @@ export default function ChatWidget({
       setMessage("");
       setTimeout(scrollToBottom, 50);
       try {
-        await axios.post(`${apiBaseUrl}/chat/send-client`, { businessSlug, clientEmail: userEmail, clientName: userName, message: messageText });
-        await loadMessages(userEmail, true);
+        await axios.post(`${apiBaseUrl}/chat/send-client`, { businessSlug, clientEmail: email, clientName: userNameRef.current, message: messageText });
+        await loadMessages(email, true);
       } catch {
         setMessages(prev => prev.filter(msg => msg.id !== tempId));
         setMessage(messageText);
@@ -449,7 +474,6 @@ export default function ChatWidget({
     return <p className="text-sm">{msg.text || msg.message}</p>;
   };
 
-  // ── Inlined message list JSX (not a component) to avoid remount on keystroke ──
   const messageListJSX = (containerRef: React.RefObject<HTMLDivElement>) => (
     <div className="overflow-y-auto p-4 bg-gray-50 h-full" ref={containerRef} style={{ scrollBehavior: 'auto' }}>
       {isLoadingMessages && isInitialLoad ? (
@@ -478,7 +502,6 @@ export default function ChatWidget({
     </div>
   );
 
-  // ── Inlined input bar JSX (not a component) to avoid remount on keystroke ──
   const inputBarJSX = (mobile = false) => (
     <div className={`bg-white border-t border-gray-200 flex-shrink-0 ${mobile ? 'px-4 py-3' : 'p-4'}`}>
       <div className="flex items-center gap-2">
@@ -494,14 +517,9 @@ export default function ChatWidget({
           placeholder="Message"
           className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm"
         />
-        {!mobile && (
-        <button 
-          onClick={handleSendMessage} 
-          className="p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors flex-shrink-0"
-        >
-          {IoSend({ size: 20 })}
+        <button onClick={handleSendMessage} className={`p-2 flex-shrink-0 ${mobile ? 'text-primaryGreen' : 'bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors'}`}>
+          {IoSend({ size: mobile ? 24 : 20 })}
         </button>
-      )}
       </div>
     </div>
   );
@@ -525,7 +543,6 @@ export default function ChatWidget({
       <div className="hidden lg:block fixed bottom-6 right-6 z-50">
         {isOpen && (
           <div className="bg-white rounded-2xl shadow-2xl w-80 mb-4 overflow-hidden border border-gray-200 flex flex-col" style={{ height: '480px' }}>
-            {/* Header */}
             <div className="bg-white p-3 flex items-center justify-between border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center gap-3">
                 {businessLogo
