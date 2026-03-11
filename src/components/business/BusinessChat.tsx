@@ -96,16 +96,10 @@ export default function BusinessChat({
     console.log('🔗 Original apiBaseUrl:', apiBaseUrl);
     console.log('🔗 process.env.REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
     
-    let socketUrl = apiBaseUrl.replace('/api', '');
-    
-    // ✅ Ensure socketUrl is valid
-    if (!socketUrl.startsWith('http://') && !socketUrl.startsWith('https://')) {
-      console.error('❌ Invalid socketUrl:', socketUrl);
-      socketUrl = 'https://api-dev.fortly.xyz'; // Fallback
-    }
-    
+    let socketUrl = apiBaseUrl.replace(/\/api$/, '');
+
     console.log('🔗 Socket connecting to:', socketUrl);
-  
+
     const socket = io(socketUrl, {
       transports: ['websocket'],
       reconnection: true,
@@ -115,9 +109,9 @@ export default function BusinessChat({
       autoConnect: true,
       timeout: 20000
     });
-  
+
     socketRef.current = socket;
-  
+
     // ✅ Define joinRoom function
     const joinRoom = () => {
       if (businessSlugRef.current) {

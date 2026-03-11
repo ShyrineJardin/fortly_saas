@@ -236,13 +236,7 @@ export default function ChatWidget({
   console.log('🔗 Original apiBaseUrl:', apiBaseUrl);
   console.log('🔗 process.env.REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
   
-  let socketUrl = apiBaseUrl.replace('/api', '');
-  
-  // ✅ Ensure socketUrl is valid
-  if (!socketUrl.startsWith('http://') && !socketUrl.startsWith('https://')) {
-    console.error('❌ Invalid socketUrl:', socketUrl);
-    socketUrl = 'https://api-dev.fortly.xyz'; // Fallback
-  }
+  let socketUrl = apiBaseUrl.replace(/\/api$/, '');
   
   console.log('🔗 Socket connecting to:', socketUrl);
 
