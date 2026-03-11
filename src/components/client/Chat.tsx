@@ -232,121 +232,77 @@ export default function ChatWidget({
   }, [businessSlug]);
 
   // ── Socket.IO — force websocket transport, guaranteed room join ──
-  useEffect(() => {
-  console.log('🔗 Original apiBaseUrl:', apiBaseUrl);
-  console.log('🔗 process.env.REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
-  
+useEffect(() => {
   let socketUrl = apiBaseUrl.replace(/\/api$/, '');
-  
   console.log('🔗 Socket connecting to:', socketUrl);
 
   const socket = io(socketUrl, {
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-    reconnectionAttempts: 10,
-    autoConnect: true,
+    reconnectionAttempts: Infinity,
     timeout: 20000
   });
 
   socketRef.current = socket;
 
-  // ✅ Define joinRoom function
-  const joinRoom = () => {
+  // ✅ Single connect handler - fires on every connect AND reconnect
+  socket.on('connect', () => {
+    console.log('✅ ChatWidget socket connected:', socket.id);
     if (businessSlugRef.current && userEmailRef.current) {
-      console.log('📤 ChatWidget joining client room:', businessSlugRef.current, userEmailRef.current);
+      console.log('📤 Joining client room:', businessSlugRef.current, userEmailRef.current);
       socket.emit('join-client', {
         businessSlug: businessSlugRef.current,
         clientEmail: userEmailRef.current
       });
     }
+  });
+
+  socket.on('connect_error', (err) => console.error('❌ Socket connect error:', err.message));
+  socket.on('disconnect', (reason) => console.log('🔌 Socket disconnected:', reason));
+
+  socket.on('new-message', async (data) => {
+    if (data.sender !== 'business') return;
+    console.log('🔔 New message from business:', data);
+    await playNotificationSound();
+    const currentEmail = userEmailRef.current;
+    if (currentEmail) await loadMessages(currentEmail, true);
+  });
+
+  socket.on('typing', (data) => {
+    if (data.sender === 'business') setIsBusinessTyping(data.isTyping);
+  });
+
+  if (Notification.permission === 'default') Notification.requestPermission();
+
+  return () => {
+    socket.off('connect');
+    socket.off('connect_error');
+    socket.off('disconnect');
+    socket.off('new-message');
+    socket.off('typing');
+    socket.disconnect();
+  };
+}, [businessSlug, apiBaseUrl]);
+
+// ✅ Re-join when email becomes available (handles late email load)
+useEffect(() => {
+  if (!userEmail || !socketRef.current) return;
+  const socket = socketRef.current;
+
+  const joinClientRoom = () => {
+    console.log('📤 Re-joining client room with email:', userEmail);
+    socket.emit('join-client', { businessSlug, clientEmail: userEmail });
   };
 
-    // ✅ Join room on connect
-    socket.on('connect', () => {
-      console.log('✅ ChatWidget socket connected:', socket.id);
-      joinRoom();
-    });
-
-    // ✅ If already connected when this runs
-    if (socket.connected) {
-      console.log('✅ Socket already connected, joining room');
-      joinRoom();
-    }
-
-    socket.on('connect_error', (err) => {
-      console.error('❌ Socket connect error:', err.message);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.log('🔌 Socket disconnected:', reason);
-    });
-
-    socket.on('new-message', async (data) => {
-      if (data.sender !== 'business') return;
-      console.log('🔔 New message from business:', data);
-
-      await playNotificationSound();
-
-      const currentEmail = userEmailRef.current;
-      if (currentEmail) {
-        await loadMessages(currentEmail, true);
-      }
-
-      if (document.hidden && Notification.permission === 'granted') {
-        new Notification(`New message from ${data.businessName}`, {
-          body: data.message?.message || 'New message received',
-          icon: '/logo192.png',
-        });
-      }
-    });
-
-    socket.on('typing', (data) => {
-      if (data.sender === 'business') {
-        setIsBusinessTyping(data.isTyping);
-      }
-    });
-
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-
-    return () => {
-      console.log('🧹 Cleaning up socket connection');
-      socket.off('connect');
-      socket.off('connect_error');
-      socket.off('disconnect');
-      socket.off('new-message');
-      socket.off('typing');
-      socket.disconnect();
-    };
-  }, [businessSlug, apiBaseUrl]);
-
-  // ✅ Re-join room when email becomes available
-  useEffect(() => {
-    if (!userEmail || !socketRef.current) return;
-    const socket = socketRef.current;
-  
-    const joinClientRoom = () => {
-      console.log('📤 ChatWidget joining client room with email:', userEmail);
-      socket.emit('join-client', {
-        businessSlug,
-        clientEmail: userEmail
-      });
-    };
-  
-    if (socket.connected) {
-      joinClientRoom();
-    } else {
-      // Socket not connected yet — attach a one-time listener
-      socket.once('connect', joinClientRoom);
-      // Cleanup if component unmounts or email changes before connect fires
-      return () => {
-        socket.off('connect', joinClientRoom);
-      };
-    }
-  }, [userEmail, businessSlug]);
+  if (socket.connected) {
+    joinClientRoom();
+  } else {
+    socket.once('connect', joinClientRoom);
+    return () => { socket.off('connect', joinClientRoom); };
+  }
+}, [userEmail, businessSlug]);
 
   const fetchBusinessDetails = async () => {
     try {

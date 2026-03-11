@@ -92,106 +92,56 @@ export default function BusinessChat({
 
   // ── Socket.IO — force websocket transport, guaranteed room join ──
   useEffect(() => {
-    // ✅ DEBUG: Log what we're working with
-    console.log('🔗 Original apiBaseUrl:', apiBaseUrl);
-    console.log('🔗 process.env.REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
-    
-    let socketUrl = apiBaseUrl.replace(/\/api$/, '');
+  let socketUrl = apiBaseUrl.replace(/\/api$/, '');
+  console.log('🔗 Socket connecting to:', socketUrl);
 
-    console.log('🔗 Socket connecting to:', socketUrl);
+  const socket = io(socketUrl, {
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: Infinity,
+    timeout: 20000
+  });
 
-    const socket = io(socketUrl, {
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 10,
-      autoConnect: true,
-      timeout: 20000
-    });
+  socketRef.current = socket;
 
-    socketRef.current = socket;
-
-    // ✅ Define joinRoom function
-    const joinRoom = () => {
-      if (businessSlugRef.current) {
-        console.log('📤 BusinessChat joining room:', businessSlugRef.current);
-        socket.emit('join-business', businessSlugRef.current);
-      }
-    };
-
-    // ✅ Join room on connect
-    socket.on('connect', () => {
-      console.log('✅ BusinessChat socket connected:', socket.id);
-      joinRoom();
-    });
-
-    // ✅ If already connected when this runs
-    if (socket.connected) {
-      console.log('✅ Socket already connected, joining room');
-      joinRoom();
+  // ✅ Single connect handler - fires on every connect AND reconnect
+  socket.on('connect', () => {
+    console.log('✅ BusinessChat socket connected:', socket.id);
+    if (businessSlugRef.current) {
+      console.log('📤 Joining business room:', businessSlugRef.current);
+      socket.emit('join-business', businessSlugRef.current);
     }
+  });
 
-    socket.on('connect_error', (err) => {
-      console.error('❌ Socket connect error:', err.message);
-    });
+  socket.on('connect_error', (err) => console.error('❌ Socket connect error:', err.message));
+  socket.on('disconnect', (reason) => console.log('🔌 Socket disconnected:', reason));
 
-    socket.on('disconnect', (reason) => {
-      console.log('🔌 Socket disconnected:', reason);
-    });
-
-    socket.on('new-message', async (data) => {
-      console.log('🔔 New message received by business:', data);
-
-      await playNotificationSound();
-
-      const currentActiveChat = activeChatRef.current;
-
-      // ✅ Always reload clients list
-      try {
-        await loadClients();
-      } catch (error) {
-        console.error('❌ Failed to reload clients:', error);
-      }
-
-      // ✅ If this is the active chat, reload messages
-      if (data.clientEmail && currentActiveChat === data.clientEmail) {
-        try {
-          await loadMessages(data.clientEmail, true);
-        } catch (error) {
-          console.error('❌ Failed to reload messages:', error);
-        }
-      }
-
-      if (document.hidden && Notification.permission === 'granted') {
-        new Notification(`New message from ${data.clientName}`, {
-          body: data.message?.message || 'New file received',
-          icon: '/logo192.png',
-          tag: data.clientEmail
-        });
-      }
-    });
-
-    socket.on('typing', (data) => {
-      if (data.sender === 'client') {
-        setIsClientTyping(data.isTyping);
-      }
-    });
-
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
+  socket.on('new-message', async (data) => {
+    console.log('🔔 New message received by business:', data);
+    await playNotificationSound();
+    try { await loadClients(); } catch (e) { console.error(e); }
+    if (data.clientEmail && activeChatRef.current === data.clientEmail) {
+      try { await loadMessages(data.clientEmail, true); } catch (e) { console.error(e); }
     }
+  });
 
-    return () => {
-      console.log('🧹 Cleaning up socket connection');
-      socket.off('connect');
-      socket.off('connect_error');
-      socket.off('disconnect');
-      socket.off('new-message');
-      socket.off('typing');
-      socket.disconnect();
-      };
-  }, [businessSlug, apiBaseUrl]);
+  socket.on('typing', (data) => {
+    if (data.sender === 'client') setIsClientTyping(data.isTyping);
+  });
+
+  if (Notification.permission === 'default') Notification.requestPermission();
+
+  return () => {
+    socket.off('connect');
+    socket.off('connect_error');
+    socket.off('disconnect');
+    socket.off('new-message');
+    socket.off('typing');
+    socket.disconnect();
+  };
+}, [businessSlug, apiBaseUrl]);
 
   const hiddenRoutes = [
     '/business/login', '/business/signup', '/business/onboarding',
