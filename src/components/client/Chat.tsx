@@ -163,10 +163,11 @@ export default function ChatWidget({
   // ── Refs to avoid stale closures in socket handlers ──
   const userEmailRef = useRef<string>("");
   const userNameRef = useRef<string>("");
+  const businessSlugRef = useRef<string>(businessSlug);
 
-  // Keep refs in sync with state
   useEffect(() => { userEmailRef.current = userEmail; }, [userEmail]);
   useEffect(() => { userNameRef.current = userName; }, [userName]);
+  useEffect(() => { businessSlugRef.current = businessSlug; }, [businessSlug]);
 
   const scrollToBottom = () => {
     if (messageContainerRef.current) messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
@@ -230,29 +231,46 @@ export default function ChatWidget({
     };
   }, [businessSlug]);
 
-  // ── Socket.IO — set up ONCE, use refs to avoid stale closures ──
+  // ── Socket.IO — force websocket transport, guaranteed room join ──
   useEffect(() => {
     const socketUrl = apiBaseUrl.replace('/api', '');
-    socketRef.current = io(socketUrl, {
+
+    const socket = io(socketUrl, {
+      transports: ['websocket'],  // ← CRITICAL: skip polling, go straight to WS
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5
+      reconnectionAttempts: 10
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('✅ Socket connected');
+    socketRef.current = socket;
+
+    const joinRoom = () => {
       const email = userEmailRef.current;
+      console.log('📤 Emitting join-client, email:', email, 'slug:', businessSlugRef.current);
       if (email) {
-        socketRef.current?.emit('join-client', { businessSlug, clientEmail: email });
+        socket.emit('join-client', { businessSlug: businessSlugRef.current, clientEmail: email });
       }
+    };
+
+    socket.on('connect', () => {
+      console.log('✅ ChatWidget socket connected:', socket.id);
+      joinRoom();
     });
 
-    socketRef.current.on('new-message', async (data) => {
+    // If already connected when this runs
+    if (socket.connected) {
+      joinRoom();
+    }
+
+    socket.on('connect_error', (err) => {
+      console.error('❌ Socket connect error:', err.message);
+    });
+
+    socket.on('new-message', async (data) => {
       console.log('🔔 New message received by client:', data);
       await playNotificationSound();
 
-      // Use ref — always has latest email without recreating socket
       const currentEmail = userEmailRef.current;
       if (currentEmail) {
         try {
@@ -270,33 +288,29 @@ export default function ChatWidget({
       }
     });
 
-    socketRef.current.on('typing', (data) => {
+    socket.on('typing', (data) => {
       if (data.sender === 'business') setIsBusinessTyping(data.isTyping);
     });
 
     if (Notification.permission === 'default') Notification.requestPermission();
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.off('connect');
-        socketRef.current.off('new-message');
-        socketRef.current.off('typing');
-        socketRef.current.disconnect();
-      }
+      socket.off('connect');
+      socket.off('connect_error');
+      socket.off('new-message');
+      socket.off('typing');
+      socket.disconnect();
     };
-  }, [businessSlug, apiBaseUrl]); 
+  }, [businessSlug, apiBaseUrl]);
 
-  // ── Re-join socket room when email becomes available ──
+  // ── Re-join room when email becomes available (e.g. after welcome form) ──
   useEffect(() => {
-    if (!userEmail) return;
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
+    if (!userEmail || !socketRef.current) return;
+    const socket = socketRef.current;
+    if (socket.connected) {
+      console.log('📤 Re-joining room with email:', userEmail);
+      socket.emit('join-client', { businessSlug, clientEmail: userEmail });
     }
-    const handleReconnect = () => {
-      socketRef.current?.emit('join-client', { businessSlug, clientEmail: userEmail });
-    };
-    socketRef.current?.on('connect', handleReconnect);
-    return () => { socketRef.current?.off('connect', handleReconnect); };
   }, [userEmail, businessSlug]);
 
   const fetchBusinessDetails = async () => {
@@ -360,7 +374,6 @@ export default function ChatWidget({
     if (!localStorage.getItem(`appointment_${businessSlug}_email`)) {
       setLocalStorageWithEvent(`appointment_${businessSlug}_email`, userEmail);
     }
-    // Join socket room now that we have email
     if (socketRef.current?.connected) {
       socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
     }
@@ -390,7 +403,6 @@ export default function ChatWidget({
           setUserEmail(returningEmail);
           setShowReturningForm(false);
           setShowWelcomeForm(false);
-          // Join socket room
           if (socketRef.current?.connected) {
             socketRef.current.emit('join-client', { businessSlug, clientEmail: returningEmail });
           }

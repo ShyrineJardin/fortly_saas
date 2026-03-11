@@ -40,7 +40,7 @@ export default function BusinessChat({
   const { pathname } = location;
   const [isOpen, setIsOpen] = useState(false);
   const [activeChat, setActiveChat] = useState<string | null>(null);
-  const activeChatRef = useRef<string | null>(null); // ← ref to avoid stale closure
+  const activeChatRef = useRef<string | null>(null);
   const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
@@ -57,11 +57,10 @@ export default function BusinessChat({
   const socketRef = useRef<Socket | null>(null);
   const [isClientTyping, setIsClientTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const businessSlugRef = useRef<string>(businessSlug);
 
-  // Keep ref in sync with state
-  useEffect(() => {
-    activeChatRef.current = activeChat;
-  }, [activeChat]);
+  useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
+  useEffect(() => { businessSlugRef.current = businessSlug; }, [businessSlug]);
 
   const currentMessages = chatMessages[activeChat || ''] || [];
 
@@ -91,26 +90,43 @@ export default function BusinessChat({
     return () => window.removeEventListener('openChat', handleOpenChat);
   }, [businessSlug]);
 
-  // Socket.IO — set up ONCE, use ref for activeChat to avoid stale closure
+  // ── Socket.IO — force websocket transport, guaranteed room join ──
   useEffect(() => {
     const socketUrl = apiBaseUrl.replace('/api', '');
-    socketRef.current = io(socketUrl, {
+
+    const socket = io(socketUrl, {
+      transports: ['websocket'],  // ← CRITICAL: skip polling, go straight to WS
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5
+      reconnectionAttempts: 10
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('✅ Socket connected, joining business room');
-      socketRef.current?.emit('join-business', businessSlug);
+    socketRef.current = socket;
+
+    const joinRoom = () => {
+      console.log('📤 Emitting join-business:', businessSlugRef.current);
+      socket.emit('join-business', businessSlugRef.current);
+    };
+
+    socket.on('connect', () => {
+      console.log('✅ BusinessChat socket connected:', socket.id);
+      joinRoom();
     });
 
-    socketRef.current.on('new-message', async (data) => {
+    // If already connected when this runs
+    if (socket.connected) {
+      joinRoom();
+    }
+
+    socket.on('connect_error', (err) => {
+      console.error('❌ Socket connect error:', err.message);
+    });
+
+    socket.on('new-message', async (data) => {
       console.log('🔔 New message received:', data);
       await playNotificationSound();
 
-      // Use ref instead of state to avoid stale closure
       const currentActiveChat = activeChatRef.current;
       if (data.clientEmail && currentActiveChat === data.clientEmail) {
         try {
@@ -135,21 +151,20 @@ export default function BusinessChat({
       }
     });
 
-    socketRef.current.on('typing', (data) => {
+    socket.on('typing', (data) => {
       if (data.sender === 'client') setIsClientTyping(data.isTyping);
     });
 
     if (Notification.permission === 'default') Notification.requestPermission();
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.off('connect');
-        socketRef.current.off('new-message');
-        socketRef.current.off('typing');
-        socketRef.current.disconnect();
-      }
+      socket.off('connect');
+      socket.off('connect_error');
+      socket.off('new-message');
+      socket.off('typing');
+      socket.disconnect();
     };
-  }, [businessSlug, apiBaseUrl]); // ← removed activeChat from deps — use ref instead
+  }, [businessSlug, apiBaseUrl]);
 
   const hiddenRoutes = [
     '/business/login', '/business/signup', '/business/onboarding',
@@ -278,7 +293,6 @@ export default function BusinessChat({
   );
 
   const activeClient = clients.find(c => c.clientEmail === activeChat);
-
   const getInitials = (name: string) => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   const formatTimestamp = (createdAt: string) => {
