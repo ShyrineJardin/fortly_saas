@@ -82,12 +82,20 @@ const connectedUsers = new Map();
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('🔌 New client connected:', socket.id, '| origin:', socket.handshake.headers.origin);
+  console.log('🌐 Transport:', socket.conn.transport.name);
 
   socket.on('join-business', (businessSlug) => {
     console.log('📥 join-business received:', businessSlug, '| socket:', socket.id);
-    socket.join(`business-${businessSlug}`);
+    const roomName = `business-${businessSlug}`;
+    socket.join(roomName);
     connectedUsers.set(socket.id, { type: 'business', businessSlug });
-    console.log(`👔 Business ${businessSlug} joined room`);
+    
+    // ✅ Verify room join
+    const room = io.sockets.adapter.rooms.get(roomName);
+    console.log(`👔 Business ${businessSlug} joined room | Total in room: ${room?.size || 0}`);
+    
+    // ✅ Send confirmation back to client
+    socket.emit('joined', { room: roomName, success: true });
   });
 
   socket.on('join-client', ({ businessSlug, clientEmail }) => {
@@ -95,17 +103,29 @@ io.on('connection', (socket) => {
     const roomName = `client-${businessSlug}-${clientEmail}`;
     socket.join(roomName);
     connectedUsers.set(socket.id, { type: 'client', businessSlug, clientEmail });
-    console.log(`👤 Client ${clientEmail} joined room for business ${businessSlug}`);
+    
+    // ✅ Verify room join
+    const room = io.sockets.adapter.rooms.get(roomName);
+    console.log(`👤 Client ${clientEmail} joined room for business ${businessSlug} | Total in room: ${room?.size || 0}`);
+    
+    // ✅ Send confirmation back to client
+    socket.emit('joined', { room: roomName, success: true });
   });
 
   socket.on('typing', (data) => {
+    console.log('⌨️  Typing event:', data.sender, data.isTyping);
+    
     if (data.sender === 'business') {
-      io.to(`client-${data.businessSlug}-${data.clientEmail}`).emit('typing', {
+      const roomName = `client-${data.businessSlug}-${data.clientEmail}`;
+      console.log(`📤 Emitting typing to ${roomName}`);
+      io.to(roomName).emit('typing', {
         isTyping: data.isTyping,
         sender: 'business'
       });
     } else {
-      io.to(`business-${data.businessSlug}`).emit('typing', {
+      const roomName = `business-${data.businessSlug}`;
+      console.log(`📤 Emitting typing to ${roomName}`);
+      io.to(roomName).emit('typing', {
         isTyping: data.isTyping,
         sender: 'client',
         clientEmail: data.clientEmail,
@@ -114,12 +134,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
     const user = connectedUsers.get(socket.id);
     if (user) {
-      console.log(`👋 ${user.type} disconnected:`, socket.id);
+      console.log(`👋 ${user.type} disconnected:`, socket.id, '| reason:', reason);
       connectedUsers.delete(socket.id);
+    } else {
+      console.log(`👋 Unknown socket disconnected:`, socket.id, '| reason:', reason);
     }
+  });
+
+  socket.on('error', (error) => {
+    console.error('❌ Socket error:', socket.id, error);
   });
 });
 

@@ -19,7 +19,7 @@ export default function NotFoundPage() {
         }`}
       >
         {/* Animated circle */}
-        <div className="relative flex items-center justify-center mx-auto mb-8 w-40 h-40">
+        <div className="relative flex items-center justify-center mx-auto mb-8 w-52 h-52 md:w-80 md:h-80">
           <img
             src="/404-planet-animation.gif"
             alt="Planet animation"

@@ -95,27 +95,34 @@ export default function BusinessChat({
     const socketUrl = apiBaseUrl.replace('/api', '');
 
     const socket = io(socketUrl, {
-      transports: ['websocket'],  // ← CRITICAL: skip polling, go straight to WS
+      transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 10
+      reconnectionAttempts: 10,
+      autoConnect: true,  // ✅ Auto-connect
+      timeout: 20000
     });
 
     socketRef.current = socket;
 
+    // ✅ Define joinRoom function
     const joinRoom = () => {
-      console.log('📤 Emitting join-business:', businessSlugRef.current);
-      socket.emit('join-business', businessSlugRef.current);
+      if (businessSlugRef.current) {
+        console.log('📤 BusinessChat joining room:', businessSlugRef.current);
+        socket.emit('join-business', businessSlugRef.current);
+      }
     };
 
+    // ✅ Join room on connect
     socket.on('connect', () => {
       console.log('✅ BusinessChat socket connected:', socket.id);
       joinRoom();
     });
 
-    // If already connected when this runs
+    // ✅ If already connected when this runs
     if (socket.connected) {
+      console.log('✅ Socket already connected, joining room');
       joinRoom();
     }
 
@@ -123,23 +130,31 @@ export default function BusinessChat({
       console.error('❌ Socket connect error:', err.message);
     });
 
+    socket.on('disconnect', (reason) => {
+      console.log('🔌 Socket disconnected:', reason);
+    });
+
     socket.on('new-message', async (data) => {
-      console.log('🔔 New message received:', data);
+      console.log('🔔 New message received by business:', data);
+
       await playNotificationSound();
 
       const currentActiveChat = activeChatRef.current;
+
+      // ✅ Always reload clients list
+      try {
+        await loadClients();
+      } catch (error) {
+        console.error('❌ Failed to reload clients:', error);
+      }
+
+      // ✅ If this is the active chat, reload messages
       if (data.clientEmail && currentActiveChat === data.clientEmail) {
         try {
           await loadMessages(data.clientEmail, true);
         } catch (error) {
           console.error('❌ Failed to reload messages:', error);
         }
-      }
-
-      try {
-        await loadClients();
-      } catch (error) {
-        console.error('❌ Failed to reload clients:', error);
       }
 
       if (document.hidden && Notification.permission === 'granted') {
@@ -152,18 +167,24 @@ export default function BusinessChat({
     });
 
     socket.on('typing', (data) => {
-      if (data.sender === 'client') setIsClientTyping(data.isTyping);
+      if (data.sender === 'client') {
+        setIsClientTyping(data.isTyping);
+      }
     });
 
-    if (Notification.permission === 'default') Notification.requestPermission();
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
     return () => {
+      console.log('🧹 Cleaning up socket connection');
       socket.off('connect');
       socket.off('connect_error');
+      socket.off('disconnect');
       socket.off('new-message');
       socket.off('typing');
       socket.disconnect();
-    };
+      };
   }, [businessSlug, apiBaseUrl]);
 
   const hiddenRoutes = [
