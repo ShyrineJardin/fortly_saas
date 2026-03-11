@@ -412,7 +412,7 @@ export default function BusinessChat({
             onChange={(e) => { setMessage(e.target.value); handleTyping(); }}
             onKeyPress={handleKeyPress} placeholder="Message"
             className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primaryGreen text-sm" />
-          <button onClick={handleSendMessage} className="p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors">
+          <button onClick={handleSendMessage} className="hidden lg:block p-2 bg-primaryGreen text-white rounded-full hover:bg-hoverGreen transition-colors">
             {IoSend({ size: 20 })}
           </button>
         </div>

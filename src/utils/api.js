@@ -30,9 +30,13 @@ export function invalidatePrefix(prefix) {
 async function cachedGet(apiFn, cacheKey) {
   const cached = getCached(cacheKey);
   if (cached) return cached;
-  const result = await apiFn();
-  setCached(cacheKey, result);
-  return result;
+  try {
+    const result = await apiFn();
+    setCached(cacheKey, result);
+    return result;
+  } catch (error) {
+    throw error;
+  }
 }
 
 // ── Authenticated instance ──

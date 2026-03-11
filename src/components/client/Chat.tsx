@@ -284,13 +284,19 @@ export default function ChatWidget({
         socketRef.current.disconnect();
       }
     };
-  }, [businessSlug, apiBaseUrl]); // ← no userEmail dep — use ref instead
+  }, [businessSlug, apiBaseUrl]); 
 
   // ── Re-join socket room when email becomes available ──
   useEffect(() => {
-    if (userEmail && socketRef.current?.connected) {
+    if (!userEmail) return;
+    if (socketRef.current?.connected) {
       socketRef.current.emit('join-client', { businessSlug, clientEmail: userEmail });
     }
+    const handleReconnect = () => {
+      socketRef.current?.emit('join-client', { businessSlug, clientEmail: userEmail });
+    };
+    socketRef.current?.on('connect', handleReconnect);
+    return () => { socketRef.current?.off('connect', handleReconnect); };
   }, [userEmail, businessSlug]);
 
   const fetchBusinessDetails = async () => {
