@@ -254,9 +254,12 @@ export default function ChatWidget({
 
   // ✅ Define joinRoom function
   const joinRoom = () => {
-    if (businessSlugRef.current) {
-      console.log('📤 BusinessChat joining room:', businessSlugRef.current);
-      socket.emit('join-business', businessSlugRef.current);
+    if (businessSlugRef.current && userEmailRef.current) {
+      console.log('📤 ChatWidget joining client room:', businessSlugRef.current, userEmailRef.current);
+      socket.emit('join-client', {
+        businessSlug: businessSlugRef.current,
+        clientEmail: userEmailRef.current
+      });
     }
   };
 
@@ -281,17 +284,14 @@ export default function ChatWidget({
     });
 
     socket.on('new-message', async (data) => {
-      console.log('🔔 New message received by client:', data);
+      if (data.sender !== 'business') return;
+      console.log('🔔 New message from business:', data);
 
       await playNotificationSound();
 
       const currentEmail = userEmailRef.current;
       if (currentEmail) {
-        try {
-          await loadMessages(currentEmail, true);
-        } catch (error) {
-          console.error('❌ Failed to reload messages:', error);
-        }
+        await loadMessages(currentEmail, true);
       }
 
       if (document.hidden && Notification.permission === 'granted') {
@@ -326,18 +326,25 @@ export default function ChatWidget({
   // ✅ Re-join room when email becomes available
   useEffect(() => {
     if (!userEmail || !socketRef.current) return;
-
     const socket = socketRef.current;
-
-    if (socket.connected) {
-      console.log('📤 Re-joining room with email:', userEmail, 'slug:', businessSlug);
-      socket.emit('join-client', { 
-        businessSlug, 
-        clientEmail: userEmail 
+  
+    const joinClientRoom = () => {
+      console.log('📤 ChatWidget joining client room with email:', userEmail);
+      socket.emit('join-client', {
+        businessSlug,
+        clientEmail: userEmail
       });
+    };
+  
+    if (socket.connected) {
+      joinClientRoom();
     } else {
-      console.log('⏳ Socket not connected yet, will join on connect');
-      // Join will happen in the 'connect' event handler
+      // Socket not connected yet — attach a one-time listener
+      socket.once('connect', joinClientRoom);
+      // Cleanup if component unmounts or email changes before connect fires
+      return () => {
+        socket.off('connect', joinClientRoom);
+      };
     }
   }, [userEmail, businessSlug]);
 
