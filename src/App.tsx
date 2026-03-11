@@ -112,6 +112,8 @@ function UnifiedClientLayout() {
 
   const [pausedInfo, setPausedInfo] = useState<{ isPaused: boolean; businessName?: string; logo?: string } | null>(null)
   const [checking, setChecking] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+
 
   useClientBusinessMeta(businessSlug)
 
@@ -128,8 +130,7 @@ function UnifiedClientLayout() {
             logo: err.response.data.business?.logo
           });
         } else if (err.response?.status === 404) {
-          // redirect to 404
-          window.location.replace('/404');
+          setNotFound(true)
         }
         setChecking(false);
       });
@@ -142,6 +143,8 @@ function UnifiedClientLayout() {
       </div>
     );
   }
+
+  if (notFound) return <NotFoundPage />
 
   // ── Client sees "unavailable" screen if business is paused ──
   if (pausedInfo?.isPaused) {
@@ -277,6 +280,9 @@ export default function App() {
           <Route path="services" element={<BusinessServicePage />} />
           <Route path="calendar" element={<BusinessCalendar />} />
         </Route>
+
+        {/* 404 explicit route — must be before /:businessSlug */}
+        <Route path="/404" element={<NotFoundPage />} />
 
         {/* Client Routes */}
         <Route path="/:businessSlug" element={<UnifiedClientLayout />}>

@@ -81,15 +81,17 @@ const connectedUsers = new Map();
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('🔌 New client connected:', socket.id);
+  console.log('🔌 New client connected:', socket.id, '| origin:', socket.handshake.headers.origin);
 
   socket.on('join-business', (businessSlug) => {
+    console.log('📥 join-business received:', businessSlug, '| socket:', socket.id);
     socket.join(`business-${businessSlug}`);
     connectedUsers.set(socket.id, { type: 'business', businessSlug });
     console.log(`👔 Business ${businessSlug} joined room`);
   });
 
   socket.on('join-client', ({ businessSlug, clientEmail }) => {
+    console.log('📥 join-client received:', businessSlug, clientEmail, '| socket:', socket.id);
     const roomName = `client-${businessSlug}-${clientEmail}`;
     socket.join(roomName);
     connectedUsers.set(socket.id, { type: 'client', businessSlug, clientEmail });
@@ -151,17 +153,13 @@ const PORT = process.env.PORT || 5000;
 db.sequelize.authenticate()
   .then(() => {
     console.log('✅ Database connected successfully');
-    return db.sequelize.sync({ force: false }); // schema managed by migrateDatabase.js
+    return db.sequelize.sync({ force: false });
   })
-  .then(async () => {                          // ← async here is the key fix
+  .then(async () => {
     console.log('✅ Database synced');
 
-    // ── Auto-migration: run on every deploy, all IF NOT EXISTS so safe to repeat ──
     const migrations = [
-      // Bookings
       `ALTER TABLE "Bookings" ADD COLUMN IF NOT EXISTS "reminderSent" BOOLEAN NOT NULL DEFAULT false`,
-
-      // Business subscription columns
       `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "subscriptionPlan" VARCHAR(50) NOT NULL DEFAULT 'free'`,
       `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "trialEndsAt" TIMESTAMP WITH TIME ZONE`,
       `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "subscriptionStartDate" TIMESTAMP WITH TIME ZONE`,
@@ -169,14 +167,8 @@ db.sequelize.authenticate()
       `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "isPaused" BOOLEAN NOT NULL DEFAULT false`,
       `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "pausedAt" TIMESTAMP WITH TIME ZONE`,
       `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "pauseReason" TEXT`,
-
-      // Business subscriptionStatus — VARCHAR to avoid ENUM casting issues
       `ALTER TABLE "Businesses" ADD COLUMN IF NOT EXISTS "subscriptionStatus" VARCHAR(50) NOT NULL DEFAULT 'trial'`,
-
-      // Set trialEndsAt for existing businesses that don't have it yet (30 days from account creation)
       `UPDATE "Businesses" SET "trialEndsAt" = "createdAt" + INTERVAL '30 days' WHERE "trialEndsAt" IS NULL`,
-
-      // Admins table
       `CREATE TABLE IF NOT EXISTS "Admins" (
         "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         "email" VARCHAR(255) NOT NULL UNIQUE,
@@ -199,7 +191,6 @@ db.sequelize.authenticate()
       }
     }
 
-    // ── Verify columns actually exist after migration ──
     try {
       const [cols] = await db.sequelize.query(`
         SELECT column_name FROM information_schema.columns
@@ -213,12 +204,10 @@ db.sequelize.authenticate()
 
     console.log('✅ Migrations complete');
 
-    // ── Force reset admin password on every deploy (remove after confirmed working) ──
     try {
       const bcrypt = require('bcryptjs');
       const plainPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Fortly2024';
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
-      // Use raw query without QueryTypes to ensure update actually runs
       await db.sequelize.query(
         `UPDATE "Admins" SET "password" = '${hashedPassword}', "email" = '${process.env.ADMIN_EMAIL || 'admin@fortly.xyz'}', "updatedAt" = NOW()`
       );
@@ -228,7 +217,6 @@ db.sequelize.authenticate()
       );
       console.log('🔍 Verify stored hash starts with:', verify?.hash_start);
       console.log('🔍 Verify stored email:', verify?.email);
-      // Verify hash works immediately after creation
       const testMatch = await bcrypt.compare(plainPassword, hashedPassword);
       console.log('🔐 bcrypt self-test:', testMatch ? '✅ PASS' : '❌ FAIL - hash broken');
       console.log('✅ Admin password reset to:', plainPassword);
@@ -237,7 +225,6 @@ db.sequelize.authenticate()
       console.warn('⚠️  Admin reset warning:', err.message);
     }
 
-    // ── Auto-create default admin if none exists ──
     try {
       const adminCount = await db.sequelize.query(
         'SELECT COUNT(*) as count FROM "Admins"',
@@ -247,7 +234,7 @@ db.sequelize.authenticate()
       if (count === 0) {
         const bcrypt = require('bcryptjs');
         const plainPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Fortly2024';
-      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+        const hashedPassword = await bcrypt.hash(plainPassword, 10);
         await db.sequelize.query(`
           INSERT INTO "Admins" ("id", "email", "password", "name", "role", "isActive", "createdAt", "updatedAt")
           VALUES (gen_random_uuid(), :email, :password, 'Super Admin', 'super_admin', true, NOW(), NOW())
@@ -268,11 +255,9 @@ db.sequelize.authenticate()
       console.warn('⚠️  Admin seed warning:', err.message);
     }
 
-    // Start reminder scheduler after DB is ready
     startReminderScheduler();
     console.log('⏰ Reminder scheduler started');
 
-    // Start the HTTP + Socket.IO server
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📧 Resend email configured`);
@@ -286,7 +271,7 @@ db.sequelize.authenticate()
       } catch (err) {
         console.error('❌ DB keepalive failed:', err.message);
       }
-    }, 4 * 60 * 1000); // every 4 minutes
+    }, 4 * 60 * 1000);
 
     // Memory monitor - log every 2 minutes
     setInterval(() => {
