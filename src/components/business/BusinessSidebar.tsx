@@ -98,8 +98,12 @@ export default function BusinessSidebar() {
         const schedule = business.schedules?.find((s: any) => s.dayOfWeek === day)
         return { day, startTime: schedule?.startTime || '', endTime: schedule?.endTime || '', enabled: schedule?.enabled || false }
       })
+
+      const displayBusinessName = business.businessName === 'New Business' ? '' : business.businessName
+
+
       const data = {
-        businessName: business.businessName || '',
+        businessName: displayBusinessName,
         ownerName: business.ownerName || '',
         logo: null,
         logoPreview: business.logo || '',

@@ -114,7 +114,7 @@ export default function Onboarding() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-
+    
     if (!businessName.trim()) {
       setError('Business name is required')
       return
@@ -127,9 +127,9 @@ export default function Onboarding() {
       setError('Please select a business category')
       return
     }
-
+  
     setLoading(true)
-
+  
     try {
       const data = new FormData()
       data.append('businessName', businessName)
@@ -139,14 +139,15 @@ export default function Onboarding() {
       data.append('location', formData.location)
       data.append('tagline', formData.tagline)
       data.append('description', formData.description)
-
+    
       if (formData.logo) {
         data.append('logo', formData.logo)
       }
-
+    
       const response = await businessAPI.completeOnboarding(data)
       console.log('Onboarding completed:', response.data)
-      navigate('/business/gallery')
+      
+      window.location.href = '/business/gallery'
     } catch (err: any) {
       console.error('Onboarding error:', err)
       setError(err.response?.data?.message || 'Failed to complete onboarding. Please try again.')
