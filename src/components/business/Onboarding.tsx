@@ -53,9 +53,13 @@ export default function Onboarding() {
       try {
         const response = await authAPI.getMe()
         const business = response.data.business
-        
-        setBusinessName(business.businessName)
-        
+
+        const businessNameValue = business.businessName === 'New Business' 
+          ? '' 
+          : business.businessName;
+
+        setBusinessName(businessNameValue)
+
         setFormData(prev => ({
           ...prev,
           ownerName: business.ownerName || '',
@@ -65,8 +69,8 @@ export default function Onboarding() {
           tagline: business.tagline || '',
           description: business.description || '',
         }))
-        
-        if (business.logo) {
+
+        if (business.logo && business.logo !== '') {
           setLogoPreview(business.logo)
         }
       } catch (err) {
