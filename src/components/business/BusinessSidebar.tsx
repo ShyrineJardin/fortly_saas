@@ -224,8 +224,15 @@ export default function BusinessSidebar() {
       if (formData.logo) data.append('logo', formData.logo)
 
       invalidateCache('auth-me')
-      await businessAPI.updateProfile(data)
+      const response = await businessAPI.updateProfile(data)
       invalidateCache('auth-me')
+
+      const updatedSlug = response?.data?.business?.slug
+      if (updatedSlug) {
+        localStorage.setItem('businessSlug', updatedSlug)
+        window.dispatchEvent(new CustomEvent('businessSlugUpdated', { detail: { slug: updatedSlug } }))
+      }
+
       await fetchBusinessData()  // updates both savedData and formData
       setIsEditing(false)
     } catch (err: any) {

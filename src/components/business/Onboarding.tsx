@@ -152,6 +152,8 @@ export default function Onboarding() {
       if (updatedBusiness.slug) {
         localStorage.setItem('businessSlug', updatedBusiness.slug)
         console.log('✅ Updated businessSlug in localStorage:', updatedBusiness.slug)
+        window.dispatchEvent(new CustomEvent('businessSlugUpdated', { detail: { slug: updatedBusiness.slug } }))
+
       }
       
       window.location.href = '/business/gallery'
