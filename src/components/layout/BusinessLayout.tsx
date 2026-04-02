@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import HeaderLogo from '../business/HeaderLogo'
 import BusinessHeader from '../business/BusinessHeader'
 import BusinessChat from '../business/BusinessChat'
+import { authAPI } from '../../utils/api'
 
 type Props = {
   sidebar?: React.ReactElement
@@ -15,8 +16,31 @@ export default function BusinessLayout({ sidebar, children, footer, showHeader, 
   const [businessSlug, setBusinessSlug] = useState<string>('')
 
   useEffect(() => {
-    const slug = localStorage.getItem('businessSlug')
-    if (slug) setBusinessSlug(slug)
+    const cachedSlug = localStorage.getItem('businessSlug')
+    if (cachedSlug) {
+      setBusinessSlug(cachedSlug)
+    }
+
+    const fetchBusinessSlug = async () => {
+      try {
+        const response = await authAPI.getMe()
+        const freshSlug = response.data.business?.slug
+        
+        if (freshSlug) {
+          setBusinessSlug(freshSlug)
+          localStorage.setItem('businessSlug', freshSlug)
+          
+          // ✅ Log if slug changed
+          if (cachedSlug && cachedSlug !== freshSlug) {
+            console.log('✅ Slug updated:', cachedSlug, '→', freshSlug)
+          }
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch business slug:', error)
+      }
+    }
+
+    fetchBusinessSlug()
   }, [])
   
   return (

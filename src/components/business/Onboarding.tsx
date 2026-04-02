@@ -147,6 +147,13 @@ export default function Onboarding() {
       const response = await businessAPI.completeOnboarding(data)
       console.log('Onboarding completed:', response.data)
       
+      const updatedBusiness = response.data.business
+      
+      if (updatedBusiness.slug) {
+        localStorage.setItem('businessSlug', updatedBusiness.slug)
+        console.log('✅ Updated businessSlug in localStorage:', updatedBusiness.slug)
+      }
+      
       window.location.href = '/business/gallery'
     } catch (err: any) {
       console.error('Onboarding error:', err)
