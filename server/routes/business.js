@@ -43,14 +43,23 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([{ name: 'logo', max
       onboardingCompleted: true
     };
 
-    if (businessName && businessName.trim() && businessName !== business.businessName) {
+    if (businessName && businessName.trim()) {
       const existingBusiness = await db.Business.findOne({
-        where: { businessName, id: { [db.Sequelize.Op.ne]: business.id } }
+        where: { 
+          businessName, 
+          id: { [db.Sequelize.Op.ne]: business.id } 
+        }
       });
-      if (existingBusiness) return res.status(400).json({ message: 'Business name already taken' });
+      
+      if (existingBusiness) {
+        return res.status(400).json({ message: 'Business name already taken' });
+      }
 
       updateData.businessName = businessName;
-      updateData.slug = await generateUniqueSlug(businessName, business.id);
+      
+      if (business.slug.startsWith('user-') || business.businessName === 'New Business') {
+        updateData.slug = await generateUniqueSlug(businessName, business.id);
+      }
     }
 
     if (req.files?.logo) {
@@ -63,7 +72,10 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([{ name: 'logo', max
       attributes: { exclude: ['password'] }
     });
 
-    res.json({ message: 'Onboarding completed successfully', business: updatedBusiness });
+    res.json({ 
+      message: 'Onboarding completed successfully', 
+      business: updatedBusiness  
+    });
   } catch (error) {
     console.error('Onboarding error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
