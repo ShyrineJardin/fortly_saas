@@ -74,7 +74,7 @@ router.put('/onboarding', authMiddleware, uploadLogo.fields([{ name: 'logo', max
 
     res.json({ 
       message: 'Onboarding completed successfully', 
-      business: updatedBusiness
+      business: updatedBusiness  
     });
   } catch (error) {
     console.error('Onboarding error:', error);
