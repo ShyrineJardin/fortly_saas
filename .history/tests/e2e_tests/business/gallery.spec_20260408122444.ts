@@ -1,0 +1,15 @@
+import { test, expect} from '@playwright/test';
+
+test.describe('Business Gallery', () => {
+    test('Upload and display images in the gallery', async ({ page }) => {
+        // Gallery tab should go to /business/gallery
+        await page.click("button:has-text('Gallery')");
+        await page.waitForURL(process.env.BASE_URL + '/business/gallery');
+        console.log('✅ Navigated to gallery page');
+
+        // Click Upload button and select an image
+        const [fileChooser] = await Promise.all([
+            
+        ])
+    });
+});
