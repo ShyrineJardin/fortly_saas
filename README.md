@@ -2,6 +2,18 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Transactional email
+
+The server sends password reset, booking, chat, and appointment reminder emails through Brevo. Set these variables in the server environment:
+
+```env
+BREVO_API_KEY=your_brevo_api_key
+BREVO_SENDER_EMAIL=verified-sender@example.com
+BREVO_SENDER_NAME=Fortly
+```
+
+Use your development API key in your local `.env` and your production API key in your hosting provider's server-side environment settings. Both keys must belong to an account with transactional email enabled. Verify the sender email/domain in Brevo before testing. Keep API keys out of frontend code and source control.
+
 ## Available Scripts
 
 In the project directory, you can run:

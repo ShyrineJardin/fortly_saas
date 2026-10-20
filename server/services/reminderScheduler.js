@@ -1,8 +1,6 @@
 const cron = require('node-cron');
 const { Op } = require('sequelize');
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
-
+const { sendEmail } = require('./emailTransport');
 
 const db = require('../config/database');
 
@@ -72,8 +70,6 @@ const startReminderScheduler = () => {
 
 // ── Send reminder to both client and business ──
 const sendReminderEmails = async (booking, business, service) => {
-  const FROM_EMAIL = 'Fortly <noreply@fortly.xyz>';
-
   const formatTime = (timeString) => {
     const [hours, minutes] = timeString.split(':');
     const hour = parseInt(hours);
@@ -254,20 +250,25 @@ const sendReminderEmails = async (booking, business, service) => {
   `;
 
   // Send both emails in parallel
-  await Promise.allSettled([
-    resend.emails.send({
-      from: FROM_EMAIL,
+  const results = await Promise.allSettled([
+    sendEmail({
       to: booking.clientEmail,
       subject: `⏰ Reminder: Your appointment with ${business.businessName} is in 1 hour`,
       html: clientHtml
     }),
-    resend.emails.send({
-      from: FROM_EMAIL,
+    sendEmail({
       to: business.email,
       subject: `🔔 Reminder: Appointment with ${booking.clientName} in 1 hour`,
       html: businessHtml
     })
   ]);
+
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      const recipient = index === 0 ? booking.clientEmail : business.email;
+      console.error(`❌ Appointment reminder email failed for ${recipient}:`, result.reason.message);
+    }
+  });
 };
 
 module.exports = { startReminderScheduler };
