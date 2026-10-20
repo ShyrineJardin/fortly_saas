@@ -1,22 +1,8 @@
-const { Resend } = require('resend');
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const FROM_EMAIL = 'Fortly <noreply@fortly.xyz>';
+const { sendEmail } = require('./emailTransport');
 
 let emailCount = 0;
 
 // ==================== HELPER ====================
-
-const sendEmail = async ({ to, subject, html }) => {
-  const { error } = await resend.emails.send({
-    from: FROM_EMAIL,
-    to,
-    subject,
-    html
-  });
-  if (error) throw new Error(error.message);
-};
 
 // ==================== EMAIL SERVICE CLASS ====================
 
