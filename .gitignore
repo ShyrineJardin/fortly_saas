@@ -20,6 +20,10 @@
 .env.test
 .env
 
+.env*
+!.env.example
+.history/.env*
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
