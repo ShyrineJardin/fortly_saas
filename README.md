@@ -4,6 +4,18 @@ A full three-layer test automation suite for **Fortly**, a SaaS platform that he
 
 The suite covers **Unit Tests**, **Integration Tests**, and **End-to-End Tests** — written with [Playwright](https://playwright.dev) and [Jest](https://jestjs.io), with credentials managed securely via environment variables.
 
+## Transactional email
+
+The server sends password reset, booking, chat, and appointment reminder emails through Brevo. Set these variables in the server environment:
+
+```env
+BREVO_API_KEY=your_brevo_api_key
+BREVO_SENDER_EMAIL=verified-sender@example.com
+BREVO_SENDER_NAME=Fortly
+```
+
+Use your development API key in your local `.env` and your production API key in your hosting provider's server-side environment settings. Both keys must belong to an account with transactional email enabled. Verify the sender email/domain in Brevo before testing. Keep API keys out of frontend code and source control.
+
 > ⚠️ **Note:** All credentials and environment-specific URLs are stored in environment variables and are not included in this repository. See [Setup](#setup) for configuration instructions.
 
 ---
